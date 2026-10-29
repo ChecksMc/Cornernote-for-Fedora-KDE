@@ -94,16 +94,16 @@ and common numeric date forms. Position uses `position_horizontal` and
 `offset_x` and `offset_y` tune that reference point in pixels. Positive X
 moves right and positive Y moves down. `monitor` selects `primary` or a
 connected screen by its zero-based GDK display index; the settings page lists
-each screen's model and resolution. The settings page also includes a folder
+connected screens by their display number. The settings page also includes a folder
 chooser; under Plasma, GTK uses the available KDE file chooser portal.
 
 The default vault path is `~/Documents`. Change it in settings to the root of
 your own Obsidian vault before saving notes.
 
 Settings are grouped into display and position, vault and files, animation,
-and appearance sections. The **Appearance** button expands the embedded style
-editor in the settings page. It previews the style and offers Plasma colors,
-Pywal colors, ten built-in palettes, editable custom colors, font family and
+and appearance sections. Expand **Appearance and style** to open the embedded
+editor. It previews the style and offers Plasma colors, Pywal colors, ten
+built-in palettes, editable custom colors, installed font families and font
 size, a local image backdrop, and rounded paper corners. The selected style is
 saved to `config.json` and applied to the overlay. By default, colors follow
 Plasma's `kdeglobals` palette, which CornerNote watches for changes. Text
