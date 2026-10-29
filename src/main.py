@@ -29,6 +29,7 @@ from ipc import start_server
 from obsidian import write_note
 from state import Mode, NoteState
 from style import CONFIG_PATH, build_css, load_config, save_config
+from style_editor import StyleEditor
 
 Config = dict[str, Any]
 
@@ -54,6 +55,7 @@ class CornerNote(Gtk.Window):
         self.position_vertical_edge = LayerShell.Edge.TOP
         self.position_vertical_base = 0
         self.active_monitor: Any | None = None
+        self.style_editor: StyleEditor | None = None
 
         self.set_title("CornerNote")
         self.set_name("cornernote")
@@ -350,13 +352,9 @@ class CornerNote(Gtk.Window):
         delay = Gtk.SpinButton.new_with_range(0, 3000, 100)
         delay.set_numeric(True)
         add_row(10, "Hide delay (ms)", "collapse_delay_ms", delay)
-        theme = Gtk.ComboBoxText()
-        theme.get_style_context().add_class("cn-folder")
-        theme.connect("notify::popup-shown", self._on_folder_popup)
-        for source, label in (("plasma", "Plasma colors"), ("pywal", "Pywal colors"),
-                              ("fallback", "Built-in palette")):
-            theme.append(source, label)
-        add_row(11, "Color source", "theme_source", theme)
+        style_button = Gtk.Button(label="[ Open style editor… ]")
+        style_button.connect("clicked", lambda *_: self._open_style_editor())
+        add_row(11, "Appearance", "style_editor", style_button)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.settings_status = Gtk.Label(xalign=0)
@@ -393,7 +391,6 @@ class CornerNote(Gtk.Window):
             self.config.get("position_vertical", "top"))
         fields["offset_x"].set_value(self.config.get("offset_x", 0))
         fields["offset_y"].set_value(self.config.get("offset_y", 0))
-        fields["theme_source"].set_active_id(self.config.get("theme_source", "plasma"))
         self.settings_status.set_text("")
         self.page_stack.set_visible_child_name("settings")
         fields["default_vault_path"].grab_focus()
@@ -419,7 +416,6 @@ class CornerNote(Gtk.Window):
         new_config["offset_x"] = fields["offset_x"].get_value_as_int()
         new_config["offset_y"] = fields["offset_y"].get_value_as_int()
         new_config["monitor"] = fields["monitor"].get_active_id() or "primary"
-        new_config["theme_source"] = fields["theme_source"].get_active_id() or "plasma"
         if not new_config["default_vault_path"] or not new_config["note_filename"].endswith(".md"):
             self.settings_status.set_text("Enter a vault path and a .md filename.")
             return
@@ -433,6 +429,21 @@ class CornerNote(Gtk.Window):
         self._refresh_folder_choices()
         self._refresh_css()
         self.settings_status.set_text("Settings saved.")
+
+    def _open_style_editor(self) -> None:
+        """Present the independent appearance editor window."""
+        if self.style_editor is None:
+            self.style_editor = StyleEditor(self, self.config, self._apply_style_config)
+        else:
+            self.style_editor.set_config(self.config)
+        self.style_editor.show_all()
+        self.style_editor.present()
+
+    def _apply_style_config(self, updated: Config) -> None:
+        """Persist appearance settings and refresh the overlay stylesheet."""
+        save_config(updated, self.config_path)
+        self.config.update(updated)
+        self._refresh_css()
 
     def _choose_vault_folder(self) -> None:
         """Use GTK's native folder chooser; Plasma routes it through its KDE portal."""

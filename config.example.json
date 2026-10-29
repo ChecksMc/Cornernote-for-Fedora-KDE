@@ -18,5 +18,12 @@
   "collapse_delay_ms": 700,
   "theme_source": "plasma",
   "theme_fallback": "catppuccin_mocha",
+  "custom_palette": {
+    "background": "#1e1e2e",
+    "foreground": "#cdd6f4",
+    "accent": "#89b4fa",
+    "muted": "#6c7086",
+    "card": "#313244"
+  },
   "folders": []
 }

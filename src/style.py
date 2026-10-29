@@ -25,13 +25,64 @@ DEFAULTS: Config = {
     "note_filename": "QuickNotes.md", "date_format": "%Y-%m-%d",
     "font_family": "Monospace", "font_size": 11, "anim_ms": 320,
     "collapse_delay_ms": 700, "theme_source": "plasma",
-    "theme_fallback": "catppuccin_mocha", "folders": [],
+    "theme_fallback": "catppuccin_mocha",
+    "custom_palette": {"background": "#1e1e2e", "foreground": "#cdd6f4",
+                       "accent": "#89b4fa", "muted": "#6c7086", "card": "#313244"},
+    "folders": [],
+}
+PALETTE_LABELS: dict[str, str] = {
+    "catppuccin_mocha": "Catppuccin Mocha",
+    "catppuccin_latte": "Catppuccin Latte",
+    "dracula": "Dracula",
+    "gruvbox_dark": "Gruvbox Dark",
+    "gruvbox_light": "Gruvbox Light",
+    "nord": "Nord",
+    "retro_green": "Retro Green",
+    "solarized_dark": "Solarized Dark",
+    "solarized_light": "Solarized Light",
+    "tokyo_night": "Tokyo Night",
 }
 PALETTES: dict[str, Palette] = {
-    "catppuccin_mocha": {"background": "#1e1e2e", "foreground": "#cdd6f4",
-                          "accent": "#89b4fa", "muted": "#6c7086", "card": "#313244"},
-    "retro_green": {"background": "#0a0f0a", "foreground": "#b8ffb8",
-                    "accent": "#42e66c", "muted": "#4d8055", "card": "#101b12"},
+    "catppuccin_mocha": {
+        "background": "#1e1e2e", "foreground": "#cdd6f4", "accent": "#89b4fa",
+        "muted": "#6c7086", "card": "#313244",
+    },
+    "catppuccin_latte": {
+        "background": "#eff1f5", "foreground": "#4c4f69", "accent": "#1e66f5",
+        "muted": "#7c7f93", "card": "#e6e9ef",
+    },
+    "dracula": {
+        "background": "#282a36", "foreground": "#f8f8f2", "accent": "#bd93f9",
+        "muted": "#6272a4", "card": "#343746",
+    },
+    "gruvbox_dark": {
+        "background": "#282828", "foreground": "#ebdbb2", "accent": "#fabd2f",
+        "muted": "#928374", "card": "#3c3836",
+    },
+    "gruvbox_light": {
+        "background": "#fbf1c7", "foreground": "#3c3836", "accent": "#af3a03",
+        "muted": "#7c6f64", "card": "#f2e5bc",
+    },
+    "nord": {
+        "background": "#2e3440", "foreground": "#eceff4", "accent": "#88c0d0",
+        "muted": "#7b88a1", "card": "#3b4252",
+    },
+    "retro_green": {
+        "background": "#0a0f0a", "foreground": "#b8ffb8", "accent": "#42e66c",
+        "muted": "#73a17b", "card": "#101b12",
+    },
+    "solarized_dark": {
+        "background": "#002b36", "foreground": "#eee8d5", "accent": "#b58900",
+        "muted": "#839496", "card": "#073642",
+    },
+    "solarized_light": {
+        "background": "#fdf6e3", "foreground": "#586e75", "accent": "#268bd2",
+        "muted": "#839496", "card": "#eee8d5",
+    },
+    "tokyo_night": {
+        "background": "#1a1b26", "foreground": "#c0caf5", "accent": "#7aa2f7",
+        "muted": "#565f89", "card": "#24283b",
+    },
 }
 
 
@@ -83,8 +134,14 @@ def load_config(path: str | Path | None = None) -> Config:
             monitor = "primary"
     config["monitor"] = monitor
     config["collapse_delay_ms"] = max(0, int(config.get("collapse_delay_ms", 700)))
-    if config.get("theme_source") not in ("plasma", "pywal", "fallback"):
+    if config.get("theme_source") not in ("plasma", "pywal", "fallback", "custom"):
         config["theme_source"] = "plasma"
+    if not isinstance(config.get("theme_fallback"), str) or config["theme_fallback"] not in PALETTES:
+        config["theme_fallback"] = "catppuccin_mocha"
+    custom_palette = config.get("custom_palette")
+    if not isinstance(custom_palette, dict) or not all(
+            _valid_color(custom_palette.get(key)) for key in PALETTES["catppuccin_mocha"]):
+        config["custom_palette"] = dict(PALETTES["catppuccin_mocha"])
     config["folders"] = list(config.get("folders") or [])
     return config
 
@@ -120,6 +177,11 @@ def _valid_color(value: Any) -> str | None:
     return None
 
 
+def palette_options() -> tuple[tuple[str, str], ...]:
+    """Return stable IDs and display names for built-in color themes."""
+    return tuple(PALETTE_LABELS.items())
+
+
 def _plasma_palette() -> Palette | None:
     """Read the active Plasma color scheme from kdeglobals."""
     parser = configparser.ConfigParser(interpolation=None)
@@ -139,7 +201,7 @@ def _plasma_palette() -> Palette | None:
                 "accent": rgb(window, "DecorationFocus", "#89b4fa"),
                 "muted": rgb(view, "ForegroundInactive", "#6c7086"),
                 "card": rgb(view, "BackgroundAlternate", "#313244")}
-    except (OSError, KeyError, ValueError):
+    except (configparser.Error, OSError, KeyError, ValueError):
         return None
 
 
@@ -154,7 +216,7 @@ def _pywal_palette() -> Palette | None:
             "card": colors.get("color0"),
         }
         if all(_valid_color(color) for color in palette.values()):
-            return palette
+            return {key: str(color) for key, color in palette.items()}
     except (OSError, ValueError, TypeError, AttributeError):
         return None
     return None
@@ -162,6 +224,12 @@ def _pywal_palette() -> Palette | None:
 
 def get_palette(config: Config) -> Palette:
     source = config.get("theme_source", "plasma")
+    if source == "custom":
+        custom = config.get("custom_palette", {})
+        if isinstance(custom, dict) and all(
+                _valid_color(custom.get(key)) for key in PALETTES["catppuccin_mocha"]):
+            return {key: str(custom[key]) for key in PALETTES["catppuccin_mocha"]}
+        return dict(PALETTES[config.get("theme_fallback", "catppuccin_mocha")])
     order: tuple[Callable[[], Palette | None], ...] = {
         "plasma": (_plasma_palette, _pywal_palette),
         "pywal": (_pywal_palette, _plasma_palette),
@@ -171,7 +239,7 @@ def get_palette(config: Config) -> Palette:
         palette = loader()
         if palette:
             return palette
-    return PALETTES.get(config.get("theme_fallback"), PALETTES["catppuccin_mocha"])
+    return dict(PALETTES.get(config.get("theme_fallback"), PALETTES["catppuccin_mocha"]))
 
 
 def _contrast_color(color: str, background: str) -> str:
@@ -194,7 +262,8 @@ def build_css(config: Config) -> str:
     palette = get_palette(config)
     palette = dict(palette)
     palette["foreground"] = _contrast_color(palette["foreground"], palette["card"])
-    font = str(config.get("font_family", "Monospace")).replace('"', "")
+    font = str(config.get("font_family", "Monospace"))
+    font = "".join(character for character in font if character.isalnum() or character in " _-")
     size = int(config.get("font_size", 11))
     return f"""
 window, .corner-note-root {{ background-color: {palette['background']}; color: {palette['foreground']};
@@ -214,4 +283,23 @@ window, .corner-note-root {{ background-color: {palette['background']}; color: {
 .cn-dialog {{ background-color: {palette['card']}; border: 2px dashed {palette['accent']}; padding: 5px; }}
 .cn-status {{ color: {palette['accent']}; padding: 2px 5px; }}
 .cn-settings label {{ color: {palette['foreground']}; }}
+"""
+
+
+def build_preview_css(config: Config) -> str:
+    """Build uniquely scoped styles for the standalone theme preview."""
+    palette = dict(get_palette(config))
+    palette["foreground"] = _contrast_color(palette["foreground"], palette["card"])
+    font = str(config.get("font_family", "Monospace"))
+    font = "".join(character for character in font if character.isalnum() or character in " _-")
+    size = int(config.get("font_size", 11))
+    return f"""
+.cn-style-preview {{ background-color: {palette['background']}; color: {palette['foreground']};
+  font-family: "{font or 'Monospace'}", monospace; font-size: {size}px;
+  border: 3px solid {palette['muted']}; }}
+.cn-style-card {{ background-color: {palette['card']}; color: {palette['foreground']};
+  border: 2px solid {palette['muted']}; }}
+.cn-style-accent {{ color: {palette['accent']}; font-weight: bold; }}
+.cn-style-apply {{ background-color: {palette['accent']}; color: {palette['background']};
+  border: 2px solid {palette['foreground']}; border-radius: 0; font-weight: bold; }}
 """

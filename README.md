@@ -81,17 +81,21 @@ chooser; under Plasma, GTK uses the available KDE file chooser portal.
 The default vault path is `~/Documents`. Change it in settings to the root of
 your own Obsidian vault before saving notes.
 
-By default, colors follow Plasma's `kdeglobals` palette. CornerNote watches
-for Plasma palette changes while running. The settings page can instead select
-Pywal colors or the configured built-in palette. Text contrast is corrected
-when a selected palette would make note text hard to read. The hide delay and
-slide duration are adjustable in settings; defaults are 700 ms and 320 ms.
+The external Style Editor opens from Settings → Appearance. It previews the
+style and offers Plasma colors, Pywal colors, ten built-in palettes, editable
+custom colors, and font family and size. The selected style is saved to
+`config.json` and applied to the overlay. By default, colors follow Plasma's
+`kdeglobals` palette, which CornerNote watches for changes. Text contrast is
+corrected when a selected palette would make note text hard to read. The hide
+delay and slide duration are adjustable in settings; defaults are 700 ms and
+320 ms.
 
 ## Files
 
 - `src/main.py` — GTK layer-shell overlay and daemon entry point
 - `src/state.py` — draft buffer and note interaction state machine
 - `src/style.py` — config, Pywal/KDE palette loading, and GTK CSS
+- `src/style_editor.py` — standalone appearance editor and live preview
 - `src/ipc.py` — GLib-integrated Unix socket server and CLI client
 - `src/obsidian.py` — safe Markdown path selection and append writer
 - `corner-note` — IPC command-line client
