@@ -1,8 +1,8 @@
-"""Standalone GTK window for previewing and editing CornerNote appearance."""
+"""Embedded GTK controls for editing and previewing CornerNote appearance."""
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from gi.repository import Gdk, Gtk
 
@@ -17,35 +17,27 @@ COLOR_FIELDS: tuple[tuple[str, str], ...] = (
 )
 
 
-class StyleEditor(Gtk.Window):
-    """Edit theme source, palette, colors, and font in a separate window."""
+class StyleEditor(Gtk.Box):
+    """Embed theme, color, image, and font controls in the settings page."""
 
-    def __init__(self, parent: Gtk.Window, config: Config,
-                 on_apply: Callable[[Config], None]) -> None:
-        """Create an external editor window linked to its overlay parent."""
-        super().__init__(type=Gtk.WindowType.TOPLEVEL)
-        self.parent_window = parent
+    def __init__(self, config: Config, on_apply: Callable[[Config], None],
+                 on_popup_changed: Callable[[Any, Any], None]) -> None:
+        """Create an inline editor and connect popup visibility handling."""
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.config = dict(config)
         self.on_apply = on_apply
+        self.on_popup_changed = on_popup_changed
         self._loading = False
         self.color_buttons: dict[str, Gtk.ColorButton] = {}
         self.preview_provider: Gtk.CssProvider | None = None
 
-        self.set_title("CornerNote Style Editor")
-        self.set_default_size(560, 520)
-        self.set_resizable(False)
-        self.set_transient_for(parent)
-        self.set_destroy_with_parent(False)
-        self.connect("delete-event", self._on_delete)
+        self.set_border_width(10)
         self._build_ui()
         self._load_config()
-        self.show_all()
 
     def _build_ui(self) -> None:
         """Build theme controls, color selectors, preview, and actions."""
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        outer.set_border_width(14)
-        self.add(outer)
+        outer = self
 
         heading = Gtk.Label(label="CornerNote Style Editor", xalign=0)
         heading.get_style_context().add_class("cn-style-heading")
@@ -61,12 +53,14 @@ class StyleEditor(Gtk.Window):
                               ("custom", "Custom colors")):
             self.source_combo.append(source, label)
         self.source_combo.connect("changed", self._on_source_changed)
+        self.source_combo.connect("notify::popup-shown", self.on_popup_changed)
         self._add_control(grid, 0, "Color source", self.source_combo)
 
         self.palette_combo = Gtk.ComboBoxText()
         for palette_id, label in palette_options():
             self.palette_combo.append(palette_id, label)
         self.palette_combo.connect("changed", self._on_palette_changed)
+        self.palette_combo.connect("notify::popup-shown", self.on_popup_changed)
         self._add_control(grid, 1, "Built-in palette", self.palette_combo)
 
         for row, (key, label) in enumerate(COLOR_FIELDS, start=2):
@@ -122,9 +116,6 @@ class StyleEditor(Gtk.Window):
         outer.pack_start(self.status, False, False, 0)
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         outer.pack_end(actions, False, False, 0)
-        close_button = Gtk.Button(label="Close")
-        close_button.connect("clicked", lambda *_: self.hide())
-        actions.pack_end(close_button, False, False, 0)
         apply_button = Gtk.Button(label="Apply style")
         apply_button.get_style_context().add_class("cn-style-apply")
         apply_button.connect("clicked", self._on_apply)
@@ -254,7 +245,8 @@ class StyleEditor(Gtk.Window):
     def _on_browse_image(self, _button: Gtk.Button) -> None:
         """Open a native image selector for the paper backdrop."""
         dialog = Gtk.FileChooserNative.new(
-            "Select paper backdrop", self, Gtk.FileChooserAction.OPEN,
+            "Select paper backdrop", cast(Gtk.Window, self.get_toplevel()),
+            Gtk.FileChooserAction.OPEN,
             "Select", "Cancel")
         image_filter = Gtk.FileFilter()
         image_filter.set_name("Images")
@@ -285,8 +277,3 @@ class StyleEditor(Gtk.Window):
             return
         self.config.update(updated)
         self.status.set_text("Style saved.")
-
-    def _on_delete(self, _window: Gtk.Window, _event: Any) -> bool:
-        """Hide the editor so it can be reopened without rebuilding it."""
-        self.hide()
-        return True

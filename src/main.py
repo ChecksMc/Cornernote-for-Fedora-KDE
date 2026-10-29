@@ -55,7 +55,6 @@ class CornerNote(Gtk.Window):
         self.position_vertical_edge = LayerShell.Edge.TOP
         self.position_vertical_base = 0
         self.active_monitor: Any | None = None
-        self.style_editor: StyleEditor | None = None
         self._updating_append_controls = False
         self._title_was_filepath = False
 
@@ -320,71 +319,95 @@ class CornerNote(Gtk.Window):
         """Construct the configuration editor page."""
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=7)
         page.get_style_context().add_class("cn-settings")
+        heading_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         heading = Gtk.Label(label="CornerNote Settings", xalign=0)
         heading.get_style_context().add_class("cn-day")
-        page.pack_start(heading, False, False, 2)
-        grid = Gtk.Grid(column_spacing=8, row_spacing=6)
+        heading_row.pack_start(heading, True, True, 2)
+        style_button = Gtk.Button(label="[ Appearance ]")
+        style_button.connect("clicked", lambda *_: self._open_style_editor())
+        heading_row.pack_end(style_button, False, False, 0)
+        page.pack_start(heading_row, False, False, 2)
         settings_scroll = Gtk.ScrolledWindow()
         settings_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        settings_scroll.add(grid)
+        self.settings_scroll = settings_scroll
+        self.settings_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        settings_scroll.add(self.settings_content)
         page.pack_start(settings_scroll, True, True, 0)
         self.setting_widgets: dict[str, Any] = {}
 
-        def add_row(row: int, label: str, key: str, widget: Any) -> None:
-            """Add a labeled control to the settings grid."""
+        def make_group(label: str, expanded: bool = False) -> Gtk.Grid:
+            """Create an expandable settings group and return its grid."""
+            expander = Gtk.Expander(label=label)
+            expander.set_expanded(expanded)
+            group_grid = Gtk.Grid(column_spacing=8, row_spacing=6)
+            expander.add(group_grid)
+            self.settings_content.pack_start(expander, False, False, 0)
+            return group_grid
+
+        def add_row(group_grid: Gtk.Grid, row: int, label: str,
+                    key: str, widget: Any) -> None:
+            """Add one labeled setting to its group grid."""
             text = Gtk.Label(label=label, xalign=0)
             text.set_size_request(112, -1)
-            grid.attach(text, 0, row, 1, 1)
-            grid.attach(widget, 1, row, 1, 1)
+            group_grid.attach(text, 0, row, 1, 1)
+            group_grid.attach(widget, 1, row, 1, 1)
             self.setting_widgets[key] = widget
 
+        display_grid = make_group("Display and position", True)
         monitor_choice = Gtk.ComboBoxText()
         monitor_choice.get_style_context().add_class("cn-folder")
         monitor_choice.connect("notify::popup-shown", self._on_folder_popup)
-        add_row(0, "Screen", "monitor", monitor_choice)
+        add_row(display_grid, 0, "Screen", "monitor", monitor_choice)
         horizontal = Gtk.ComboBoxText()
         horizontal.get_style_context().add_class("cn-folder")
         horizontal.connect("notify::popup-shown", self._on_folder_popup)
         for value, label in (("left", "Left"), ("center", "Center"), ("right", "Right")):
             horizontal.append(value, label)
-        add_row(1, "Horizontal", "position_horizontal", horizontal)
+        add_row(display_grid, 1, "Horizontal", "position_horizontal", horizontal)
         vertical = Gtk.ComboBoxText()
         vertical.get_style_context().add_class("cn-folder")
         vertical.connect("notify::popup-shown", self._on_folder_popup)
         for value, label in (("top", "Top"), ("center", "Center"), ("bottom", "Bottom")):
             vertical.append(value, label)
-        add_row(2, "Vertical", "position_vertical", vertical)
+        add_row(display_grid, 2, "Vertical", "position_vertical", vertical)
         offset_x = Gtk.SpinButton.new_with_range(-5000, 5000, 10)
         offset_x.set_numeric(True)
-        add_row(3, "X offset (px)", "offset_x", offset_x)
+        add_row(display_grid, 3, "X offset (px)", "offset_x", offset_x)
         offset_y = Gtk.SpinButton.new_with_range(-5000, 5000, 10)
         offset_y.set_numeric(True)
-        add_row(4, "Y offset (px)", "offset_y", offset_y)
+        add_row(display_grid, 4, "Y offset (px)", "offset_y", offset_y)
         width = Gtk.SpinButton.new_with_range(240, 1600, 20)
         width.set_numeric(True)
-        add_row(5, "Width (px)", "width", width)
+        add_row(display_grid, 5, "Width (px)", "width", width)
         height = Gtk.SpinButton.new_with_range(180, 1200, 20)
         height.set_numeric(True)
-        add_row(6, "Height (px)", "height", height)
+        add_row(display_grid, 6, "Height (px)", "height", height)
         peek = Gtk.SpinButton.new_with_range(1, 50, 1)
         peek.set_numeric(True)
-        add_row(7, "Idle tab (%)", "idle_percent", peek)
+        add_row(display_grid, 7, "Idle tab (%)", "idle_percent", peek)
+
+        vault_grid = make_group("Vault and files")
         vault_entry = Gtk.Entry()
         vault_entry.set_placeholder_text("Path to your Obsidian vault")
-        add_row(8, "Obsidian vault", "default_vault_path", vault_entry)
+        add_row(vault_grid, 0, "Obsidian vault", "default_vault_path", vault_entry)
         filename_entry = Gtk.Entry()
-        add_row(9, "Markdown filename", "note_filename", filename_entry)
+        add_row(vault_grid, 1, "Markdown filename", "note_filename", filename_entry)
         date_entry = Gtk.Entry()
-        add_row(10, "Date format", "date_format", date_entry)
+        add_row(vault_grid, 2, "Date format", "date_format", date_entry)
+
+        behavior_grid = make_group("Animation")
         animation = Gtk.SpinButton.new_with_range(100, 1200, 50)
         animation.set_numeric(True)
-        add_row(11, "Slide speed (ms)", "anim_ms", animation)
+        add_row(behavior_grid, 0, "Slide speed (ms)", "anim_ms", animation)
         delay = Gtk.SpinButton.new_with_range(0, 3000, 100)
         delay.set_numeric(True)
-        add_row(12, "Hide delay (ms)", "collapse_delay_ms", delay)
-        style_button = Gtk.Button(label="[ Open style editor… ]")
-        style_button.connect("clicked", lambda *_: self._open_style_editor())
-        add_row(13, "Appearance", "style_editor", style_button)
+        add_row(behavior_grid, 1, "Hide delay (ms)", "collapse_delay_ms", delay)
+
+        self.appearance_expander = Gtk.Expander(label="Appearance and style")
+        self.style_editor = StyleEditor(self.config, self._apply_style_config,
+                                        self._on_folder_popup)
+        self.appearance_expander.add(self.style_editor)
+        self.settings_content.pack_start(self.appearance_expander, False, False, 0)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.settings_status = Gtk.Label(xalign=0)
@@ -403,8 +426,20 @@ class CornerNote(Gtk.Window):
         page.pack_end(actions, False, False, 0)
         self.page_stack.add_named(page, "settings")
 
+    def _scroll_to_appearance(self) -> bool:
+        """Scroll the settings pane so the embedded appearance controls show."""
+        adjustment = self.settings_scroll.get_vadjustment()
+        coordinates = self.appearance_expander.translate_coordinates(
+            self.settings_content, 0, 0)
+        if coordinates and coordinates[0]:
+            adjustment.set_value(max(0.0, float(coordinates[2])))
+        else:
+            adjustment.set_value(max(0.0, adjustment.get_upper() - adjustment.get_page_size()))
+        return GLib.SOURCE_REMOVE
+
     def _show_settings(self) -> None:
         """Populate setting controls from the active configuration."""
+        self.style_editor.set_config(self.config)
         fields = self.setting_widgets
         self._populate_monitor_choices()
         _display, _monitor, monitor_index = self._monitor_selection()
@@ -468,13 +503,9 @@ class CornerNote(Gtk.Window):
         self.settings_status.set_text("Settings saved.")
 
     def _open_style_editor(self) -> None:
-        """Present the independent appearance editor window."""
-        if self.style_editor is None:
-            self.style_editor = StyleEditor(self, self.config, self._apply_style_config)
-        else:
-            self.style_editor.set_config(self.config)
-        self.style_editor.show_all()
-        self.style_editor.present()
+        """Expand and reveal the embedded appearance controls."""
+        self.appearance_expander.set_expanded(True)
+        GLib.idle_add(self._scroll_to_appearance)
 
     def _apply_style_config(self, updated: Config) -> None:
         """Persist appearance settings and refresh the overlay stylesheet."""
@@ -676,6 +707,7 @@ class CornerNote(Gtk.Window):
             return False
         self.pointer_inside = False
         if (not self.dropdown_open and not self.file_chooser_open and not self.state.forced_open
+                and self.page_stack.get_visible_child_name() != "settings"
                 and self.state.mode != Mode.DISCARD_CONFIRM):
             self._schedule_collapse()
         return False
@@ -723,7 +755,8 @@ class CornerNote(Gtk.Window):
             """Collapse only if no pointer or forced-open state prevents it."""
             self.collapse_source = None
             if (not self.pointer_inside and not self.dropdown_open
-                    and not self.file_chooser_open and not self.state.forced_open):
+                    and not self.file_chooser_open and not self.state.forced_open
+                    and self.page_stack.get_visible_child_name() != "settings"):
                 self.collapse()
             return GLib.SOURCE_REMOVE
 

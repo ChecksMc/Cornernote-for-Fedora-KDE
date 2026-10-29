@@ -90,15 +90,16 @@ chooser; under Plasma, GTK uses the available KDE file chooser portal.
 The default vault path is `~/Documents`. Change it in settings to the root of
 your own Obsidian vault before saving notes.
 
-The separate Style Editor opens from Settings → Appearance. It previews the
-style and offers Plasma colors, Pywal colors, ten built-in palettes, editable
-custom colors, font family and size, a local image backdrop, and rounded paper
-corners. The selected style is saved to `config.json` and applied to the
-overlay. By default, colors follow Plasma's `kdeglobals` palette, which
-CornerNote watches for changes. Text contrast is corrected when a selected
-palette would make note text hard to read. Settings also include independent
-note width and height controls. The hide delay and slide duration are
-adjustable; defaults are 700 ms and 320 ms.
+Settings are grouped into display and position, vault and files, animation,
+and appearance sections. The **Appearance** button expands the embedded style
+editor in the settings page. It previews the style and offers Plasma colors,
+Pywal colors, ten built-in palettes, editable custom colors, font family and
+size, a local image backdrop, and rounded paper corners. The selected style is
+saved to `config.json` and applied to the overlay. By default, colors follow
+Plasma's `kdeglobals` palette, which CornerNote watches for changes. Text
+contrast is corrected when a selected palette would make note text hard to
+read. Settings also include independent note width and height controls. The
+hide delay and slide duration are adjustable; defaults are 700 ms and 320 ms.
 
 ## Files
 

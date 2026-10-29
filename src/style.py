@@ -323,7 +323,7 @@ def build_preview_css(config: Config) -> str:
     size = int(config.get("font_size", 11))
     radius = "8px" if config.get("rounded_corners", False) else "0"
     image_uri = _image_uri(config)
-    background = f'url("{image_uri}")' if image_uri else palette["background"]
+    background = f'url("{image_uri}")' if image_uri else "none"
     return f"""
 .cn-style-preview {{ background-color: {palette['background']}; background-image: {background};
   background-size: cover; background-position: center; color: {palette['foreground']};
