@@ -52,7 +52,16 @@ This manual route works across Plasma versions.
 - Press Meta+N (or your configured shortcut) to open and focus the note. The
   shortcut toggles the forced-open state.
 - Enter in the title field moves focus to the note body.
-- Ctrl+Enter appends the draft to the vault.
+- Choose **Vault note** to append a dated heading and draft to the configured
+  quick-notes file. Choose **Append to file** to append an entry to the Markdown
+  filepath in the title. A title ending in `.md` automatically selects append
+  mode; the **Append mode** checkbox can also select it explicitly. Relative
+  append paths resolve inside the configured vault; absolute `.md` paths are
+  also accepted.
+- Choose **No date** to omit the date from the saved heading. Typing `none` in
+  the date field does the same. Custom dates such as `tomorrow` or `14.10` are
+  still supported.
+- Ctrl+Enter submits using the selected mode.
 - Escape opens an inline discard confirmation. Confirm with Y/Yes or cancel
   with N/No/Escape.
 - The gear button opens settings for the vault, filename/date format, timing,
@@ -81,14 +90,15 @@ chooser; under Plasma, GTK uses the available KDE file chooser portal.
 The default vault path is `~/Documents`. Change it in settings to the root of
 your own Obsidian vault before saving notes.
 
-The external Style Editor opens from Settings → Appearance. It previews the
+The separate Style Editor opens from Settings → Appearance. It previews the
 style and offers Plasma colors, Pywal colors, ten built-in palettes, editable
-custom colors, and font family and size. The selected style is saved to
-`config.json` and applied to the overlay. By default, colors follow Plasma's
-`kdeglobals` palette, which CornerNote watches for changes. Text contrast is
-corrected when a selected palette would make note text hard to read. The hide
-delay and slide duration are adjustable in settings; defaults are 700 ms and
-320 ms.
+custom colors, font family and size, a local image backdrop, and rounded paper
+corners. The selected style is saved to `config.json` and applied to the
+overlay. By default, colors follow Plasma's `kdeglobals` palette, which
+CornerNote watches for changes. Text contrast is corrected when a selected
+palette would make note text hard to read. Settings also include independent
+note width and height controls. The hide delay and slide duration are
+adjustable; defaults are 700 ms and 320 ms.
 
 ## Files
 

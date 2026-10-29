@@ -84,6 +84,20 @@ class StyleEditor(Gtk.Window):
         self.font_size.connect("value-changed", self._on_font_changed)
         self._add_control(grid, 8, "Font size", self.font_size)
 
+        image_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.image_entry = Gtk.Entry()
+        self.image_entry.set_placeholder_text("Optional local backdrop image")
+        self.image_entry.connect("changed", self._on_image_changed)
+        image_row.pack_start(self.image_entry, True, True, 0)
+        browse = Gtk.Button(label="Browse…")
+        browse.connect("clicked", self._on_browse_image)
+        image_row.pack_end(browse, False, False, 0)
+        self._add_control(grid, 9, "Backdrop image", image_row)
+
+        self.rounded_toggle = Gtk.CheckButton(label="Use rounded paper corners")
+        self.rounded_toggle.connect("toggled", self._on_rounding_changed)
+        self._add_control(grid, 10, "Paper shape", self.rounded_toggle)
+
         preview_frame = Gtk.Frame(label="Live preview")
         outer.pack_start(preview_frame, True, True, 0)
         self.preview = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -136,6 +150,8 @@ class StyleEditor(Gtk.Window):
             button.set_rgba(rgba)
         self.font_entry.set_text(str(self.config.get("font_family", "Monospace")))
         self.font_size.set_value(int(self.config.get("font_size", 11)))
+        self.image_entry.set_text(str(self.config.get("background_image", "")))
+        self.rounded_toggle.set_active(bool(self.config.get("rounded_corners", False)))
         self._loading = False
         self._update_enabled_controls()
         self._refresh_preview()
@@ -163,6 +179,8 @@ class StyleEditor(Gtk.Window):
         config["custom_palette"] = self._current_palette()
         config["font_family"] = self.font_entry.get_text().strip() or "Monospace"
         config["font_size"] = self.font_size.get_value_as_int()
+        config["background_image"] = self.image_entry.get_text().strip()
+        config["rounded_corners"] = self.rounded_toggle.get_active()
         return config
 
     def _refresh_preview(self) -> None:
@@ -222,6 +240,40 @@ class StyleEditor(Gtk.Window):
         """Update the preview after a font setting changes."""
         if not self._loading:
             self._refresh_preview()
+
+    def _on_image_changed(self, _entry: Gtk.Entry) -> None:
+        """Refresh the backdrop preview when its image path changes."""
+        if not self._loading:
+            self._refresh_preview()
+
+    def _on_rounding_changed(self, _button: Gtk.CheckButton) -> None:
+        """Refresh the preview when paper corner rounding changes."""
+        if not self._loading:
+            self._refresh_preview()
+
+    def _on_browse_image(self, _button: Gtk.Button) -> None:
+        """Open a native image selector for the paper backdrop."""
+        dialog = Gtk.FileChooserNative.new(
+            "Select paper backdrop", self, Gtk.FileChooserAction.OPEN,
+            "Select", "Cancel")
+        image_filter = Gtk.FileFilter()
+        image_filter.set_name("Images")
+        image_filter.add_pixbuf_formats()
+        dialog.add_filter(image_filter)
+        current = self.image_entry.get_text().strip()
+        if current:
+            dialog.set_filename(current)
+
+        def response(native: Gtk.FileChooserNative, result: int) -> None:
+            """Store the selected image path and close the native picker."""
+            if result == Gtk.ResponseType.ACCEPT:
+                selected = native.get_filename()
+                if selected:
+                    self.image_entry.set_text(selected)
+            native.destroy()
+
+        dialog.connect("response", response)
+        dialog.show()
 
     def _on_apply(self, _button: Gtk.Button) -> None:
         """Persist edited appearance and report write failures inline."""

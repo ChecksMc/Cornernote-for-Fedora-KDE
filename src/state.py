@@ -18,6 +18,7 @@ class Draft:
     content: str = ""
     date_tag: str = ""
     folder: str = ""
+    append_mode: bool = False
 
     def has_content(self) -> bool:
         """Return whether any user-authored draft field is nonempty."""
@@ -29,6 +30,7 @@ class Draft:
         self.content = ""
         self.date_tag = ""
         self.folder = ""
+        self.append_mode = False
 
 
 class NoteState:

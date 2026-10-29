@@ -26,7 +26,7 @@ except (ImportError, ValueError) as exc:
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from ipc import start_server
-from obsidian import write_note
+from obsidian import append_to_file, write_note
 from state import Mode, NoteState
 from style import CONFIG_PATH, build_css, load_config, save_config
 from style_editor import StyleEditor
@@ -56,6 +56,8 @@ class CornerNote(Gtk.Window):
         self.position_vertical_base = 0
         self.active_monitor: Any | None = None
         self.style_editor: StyleEditor | None = None
+        self._updating_append_controls = False
+        self._title_was_filepath = False
 
         self.set_title("CornerNote")
         self.set_name("cornernote")
@@ -227,7 +229,7 @@ class CornerNote(Gtk.Window):
         self.title_entry.set_placeholder_text("Title…  (Enter for body)")
         self.title_entry.get_style_context().add_class("cn-title")
         self.title_entry.connect("activate", self._on_title_enter)
-        self.title_entry.connect("changed", self._sync_draft)
+        self.title_entry.connect("changed", self._on_title_changed)
         note_page.pack_start(self.title_entry, False, False, 3)
 
         self.content_buffer = Gtk.TextBuffer()
@@ -244,10 +246,17 @@ class CornerNote(Gtk.Window):
         note_page.pack_start(scroller, True, True, 2)
 
         controls = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.date_mode_combo = Gtk.ComboBoxText()
+        self.date_mode_combo.append("date", "Date")
+        self.date_mode_combo.append("none", "No date")
+        self.date_mode_combo.set_active_id("date")
+        self.date_mode_combo.connect("changed", self._on_date_mode_changed)
+        self.date_mode_combo.connect("notify::popup-shown", self._on_folder_popup)
+        controls.pack_start(self.date_mode_combo, False, False, 0)
         self.date_entry = Gtk.Entry()
-        self.date_entry.set_placeholder_text("Date: today / tomorrow / 14.10")
+        self.date_entry.set_placeholder_text("today / tomorrow / 14.10 / none")
         self.date_entry.get_style_context().add_class("cn-date-entry")
-        self.date_entry.connect("changed", self._sync_draft)
+        self.date_entry.connect("changed", self._on_date_entry_changed)
         controls.pack_start(self.date_entry, True, True, 0)
         self.folder_combo = Gtk.ComboBoxText()
         self.folder_combo.get_style_context().add_class("cn-folder")
@@ -268,11 +277,26 @@ class CornerNote(Gtk.Window):
         controls.pack_start(self.folder_combo, False, False, 0)
         note_page.pack_start(controls, False, False, 1)
 
+        append_options = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.append_mode_check = Gtk.CheckButton(label="Append mode")
+        self.append_mode_check.set_tooltip_text(
+            "Treat the title as a Markdown filepath inside your vault")
+        self.append_mode_check.connect("toggled", self._on_append_checkbox_toggled)
+        append_options.pack_start(self.append_mode_check, False, False, 0)
+        note_page.pack_start(append_options, False, False, 0)
+
         footer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
         self.status_label = Gtk.Label(xalign=0)
         self.status_label.get_style_context().add_class("cn-status")
         footer.pack_start(self.status_label, True, True, 0)
-        self.save_button = Gtk.Button(label="[ Save · Ctrl+Enter ]")
+        self.submit_mode_combo = Gtk.ComboBoxText()
+        self.submit_mode_combo.append("note", "Vault note")
+        self.submit_mode_combo.append("append", "Append to file")
+        self.submit_mode_combo.set_active_id("note")
+        self.submit_mode_combo.set_tooltip_text("Choose how this draft is submitted")
+        self.submit_mode_combo.connect("changed", self._on_submit_mode_changed)
+        footer.pack_end(self.submit_mode_combo, False, False, 0)
+        self.save_button = Gtk.Button(label="[ Submit · Ctrl+Enter ]")
         self.save_button.get_style_context().add_class("cn-save")
         self.save_button.connect("clicked", lambda *_: self.commit_note())
         footer.pack_end(self.save_button, False, False, 0)
@@ -336,25 +360,31 @@ class CornerNote(Gtk.Window):
         offset_y = Gtk.SpinButton.new_with_range(-5000, 5000, 10)
         offset_y.set_numeric(True)
         add_row(4, "Y offset (px)", "offset_y", offset_y)
+        width = Gtk.SpinButton.new_with_range(240, 1600, 20)
+        width.set_numeric(True)
+        add_row(5, "Width (px)", "width", width)
+        height = Gtk.SpinButton.new_with_range(180, 1200, 20)
+        height.set_numeric(True)
+        add_row(6, "Height (px)", "height", height)
         peek = Gtk.SpinButton.new_with_range(1, 50, 1)
         peek.set_numeric(True)
-        add_row(5, "Idle tab (%)", "idle_percent", peek)
+        add_row(7, "Idle tab (%)", "idle_percent", peek)
         vault_entry = Gtk.Entry()
         vault_entry.set_placeholder_text("Path to your Obsidian vault")
-        add_row(6, "Obsidian vault", "default_vault_path", vault_entry)
+        add_row(8, "Obsidian vault", "default_vault_path", vault_entry)
         filename_entry = Gtk.Entry()
-        add_row(7, "Markdown filename", "note_filename", filename_entry)
+        add_row(9, "Markdown filename", "note_filename", filename_entry)
         date_entry = Gtk.Entry()
-        add_row(8, "Date format", "date_format", date_entry)
+        add_row(10, "Date format", "date_format", date_entry)
         animation = Gtk.SpinButton.new_with_range(100, 1200, 50)
         animation.set_numeric(True)
-        add_row(9, "Slide speed (ms)", "anim_ms", animation)
+        add_row(11, "Slide speed (ms)", "anim_ms", animation)
         delay = Gtk.SpinButton.new_with_range(0, 3000, 100)
         delay.set_numeric(True)
-        add_row(10, "Hide delay (ms)", "collapse_delay_ms", delay)
+        add_row(12, "Hide delay (ms)", "collapse_delay_ms", delay)
         style_button = Gtk.Button(label="[ Open style editor… ]")
         style_button.connect("clicked", lambda *_: self._open_style_editor())
-        add_row(11, "Appearance", "style_editor", style_button)
+        add_row(13, "Appearance", "style_editor", style_button)
 
         actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.settings_status = Gtk.Label(xalign=0)
@@ -391,6 +421,8 @@ class CornerNote(Gtk.Window):
             self.config.get("position_vertical", "top"))
         fields["offset_x"].set_value(self.config.get("offset_x", 0))
         fields["offset_y"].set_value(self.config.get("offset_y", 0))
+        fields["width"].set_value(self.config["width"])
+        fields["height"].set_value(self.config["height"])
         self.settings_status.set_text("")
         self.page_stack.set_visible_child_name("settings")
         fields["default_vault_path"].grab_focus()
@@ -415,6 +447,8 @@ class CornerNote(Gtk.Window):
         new_config["position_vertical"] = fields["position_vertical"].get_active_id() or "top"
         new_config["offset_x"] = fields["offset_x"].get_value_as_int()
         new_config["offset_y"] = fields["offset_y"].get_value_as_int()
+        new_config["width"] = fields["width"].get_value_as_int()
+        new_config["height"] = fields["height"].get_value_as_int()
         new_config["monitor"] = fields["monitor"].get_active_id() or "primary"
         if not new_config["default_vault_path"] or not new_config["note_filename"].endswith(".md"):
             self.settings_status.set_text("Enter a vault path and a .md filename.")
@@ -425,6 +459,9 @@ class CornerNote(Gtk.Window):
             self.settings_status.set_text(f"Could not save settings: {exc}")
             return
         self.config.update(new_config)
+        self.set_default_size(new_config["width"], new_config["height"])
+        self.set_size_request(new_config["width"], new_config["height"])
+        self.resize(new_config["width"], new_config["height"])
         self._apply_position()
         self._refresh_folder_choices()
         self._refresh_css()
@@ -556,7 +593,68 @@ class CornerNote(Gtk.Window):
         draft.content = self.content_buffer.get_text(start, end, True)
         draft.date_tag = self.date_entry.get_text()
         draft.folder = self.folder_combo.get_active_text() or "(root)"
+        draft.append_mode = (self.append_mode_check.get_active()
+                             or self._is_filepath_title(draft.title))
         self.status_label.hide()
+
+    def _is_filepath_title(self, title: str) -> bool:
+        """Recognize Markdown file paths entered in the title field."""
+        return Path(os.path.expandvars(os.path.expanduser(title.strip()))).suffix.lower() == ".md"
+
+    def _on_title_changed(self, _entry: Gtk.Entry) -> None:
+        """Automatically enable append mode when the title is a Markdown path."""
+        is_filepath = self._is_filepath_title(self.title_entry.get_text())
+        if is_filepath:
+            self._set_append_mode(True)
+        elif self._title_was_filepath:
+            self._set_append_mode(False)
+        self._title_was_filepath = is_filepath
+        self._sync_draft()
+
+    def _set_append_mode(self, enabled: bool) -> None:
+        """Keep the append checkbox and submit selector synchronized."""
+        self._updating_append_controls = True
+        self.append_mode_check.set_active(enabled)
+        self.submit_mode_combo.set_active_id("append" if enabled else "note")
+        self._updating_append_controls = False
+        self._sync_draft()
+
+    def _on_append_checkbox_toggled(self, _button: Gtk.CheckButton) -> None:
+        """Mirror checkbox changes in the submit mode selector."""
+        if not self._updating_append_controls:
+            self._set_append_mode(self.append_mode_check.get_active())
+
+    def _on_submit_mode_changed(self, combo: Gtk.ComboBoxText) -> None:
+        """Mirror the selected submit action in the append checkbox."""
+        if not self._updating_append_controls:
+            self._set_append_mode(combo.get_active_id() == "append")
+
+    def _on_date_mode_changed(self, combo: Gtk.ComboBoxText) -> None:
+        """Set the date field to an explicit date or the no-date value."""
+        no_date = combo.get_active_id() == "none"
+        self.date_entry.set_sensitive(not no_date)
+        expected = "none" if no_date else "today"
+        current = self.date_entry.get_text().strip().casefold()
+        if (current in ("none", "no date")) != no_date:
+            self.date_entry.set_text(expected)
+        self._sync_draft()
+
+    def _on_date_entry_changed(self, _entry: Gtk.Entry) -> None:
+        """Keep the date selector aligned when users type `none`."""
+        value = self.date_entry.get_text().strip().casefold()
+        expected = "none" if value in ("none", "no date") else "date"
+        if self.date_mode_combo.get_active_id() != expected:
+            self.date_mode_combo.set_active_id(expected)
+        self._sync_draft()
+
+    def _clear_editor(self) -> None:
+        """Clear controls and return submission options to their defaults."""
+        self.title_entry.set_text("")
+        self.content_buffer.set_text("")
+        self.date_mode_combo.set_active_id("date")
+        self.date_entry.set_text("")
+        self.folder_combo.set_active(0)
+        self._set_append_mode(False)
 
     def _on_title_enter(self, _entry: Any) -> None:
         """Move focus from title to body when Enter is pressed."""
@@ -704,10 +802,7 @@ class CornerNote(Gtk.Window):
         """Apply the chosen discard response and restore editor focus."""
         if discard:
             self.state.confirm_discard()
-            self.title_entry.set_text("")
-            self.content_buffer.set_text("")
-            self.date_entry.set_text("")
-            self.folder_combo.set_active(0)
+            self._clear_editor()
             self.force_close()
         else:
             self.state.cancel_discard()
@@ -725,18 +820,19 @@ class CornerNote(Gtk.Window):
             self._show_status("Nothing to save.")
             return
         try:
-            destination = write_note(self.config, draft.title, draft.content,
-                                     draft.date_tag, draft.folder)
+            if draft.append_mode:
+                destination = append_to_file(self.config, draft.title, draft.content,
+                                              draft.date_tag, draft.folder)
+            else:
+                destination = write_note(self.config, draft.title, draft.content,
+                                         draft.date_tag, draft.folder)
         except (OSError, ValueError, KeyError) as exc:
             self._show_status(f"Save failed: {exc}")
             print(f"[cornernote] save failed: {exc}", file=sys.stderr)
             return
         print(f"[cornernote] saved {destination}")
         self.state.committed()
-        self.title_entry.set_text("")
-        self.content_buffer.set_text("")
-        self.date_entry.set_text("")
-        self.folder_combo.set_active(0)
+        self._clear_editor()
         self.force_close()
 
     def _show_status(self, message: str) -> None:

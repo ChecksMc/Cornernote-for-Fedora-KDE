@@ -26,6 +26,8 @@ DEFAULTS: Config = {
     "font_family": "Monospace", "font_size": 11, "anim_ms": 320,
     "collapse_delay_ms": 700, "theme_source": "plasma",
     "theme_fallback": "catppuccin_mocha",
+    "background_image": "",
+    "rounded_corners": False,
     "custom_palette": {"background": "#1e1e2e", "foreground": "#cdd6f4",
                        "accent": "#89b4fa", "muted": "#6c7086", "card": "#313244"},
     "folders": [],
@@ -114,6 +116,11 @@ def load_config(path: str | Path | None = None) -> Config:
         config["idle_fraction"] = 0.04
     config["socket_path"] = _expand(config["socket_path"])
     config["default_vault_path"] = _expand(config["default_vault_path"])
+    config["background_image"] = _expand(config.get("background_image", ""))
+    if not isinstance(config["background_image"], str):
+        config["background_image"] = ""
+    if not isinstance(config.get("rounded_corners"), bool):
+        config["rounded_corners"] = False
     for key in ("width", "height", "font_size", "anim_ms"):
         config[key] = int(config[key])
         if config[key] <= 0:
@@ -175,6 +182,18 @@ def _valid_color(value: Any) -> str | None:
         except ValueError:
             return None
     return None
+
+
+def _image_uri(config: Config) -> str | None:
+    """Return a local image URI when the configured backdrop file exists."""
+    value = config.get("background_image", "")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        path = Path(os.path.expandvars(os.path.expanduser(value.strip()))).resolve()
+        return path.as_uri() if path.is_file() else None
+    except (OSError, RuntimeError):
+        return None
 
 
 def palette_options() -> tuple[tuple[str, str], ...]:
@@ -265,11 +284,20 @@ def build_css(config: Config) -> str:
     font = str(config.get("font_family", "Monospace"))
     font = "".join(character for character in font if character.isalnum() or character in " _-")
     size = int(config.get("font_size", 11))
+    radius = "8px" if config.get("rounded_corners", False) else "0"
+    texture = (f"linear-gradient(45deg, alpha({palette['foreground']}, 0.025) 25%, transparent 25%, "
+               f"transparent 75%, alpha({palette['foreground']}, 0.025) 75%)")
+    image_uri = _image_uri(config)
+    images = f'{texture}, url("{image_uri}")' if image_uri else texture
+    image_sizes = "auto, cover" if image_uri else "auto"
+    image_repeats = "repeat, no-repeat" if image_uri else "repeat"
+    image_positions = "0 0, center" if image_uri else "0 0"
     return f"""
 window, .corner-note-root {{ background-color: {palette['background']}; color: {palette['foreground']};
-  font-family: "{font}", monospace; font-size: {size}px; border-radius: 0; }}
-.corner-note-root {{ border: 3px solid {palette['muted']}; padding: 5px;
-  background-image: linear-gradient(45deg, alpha({palette['foreground']}, 0.025) 25%, transparent 25%, transparent 75%, alpha({palette['foreground']}, 0.025) 75%); }}
+  font-family: "{font or 'Monospace'}", monospace; font-size: {size}px; border-radius: {radius}; }}
+.corner-note-root {{ border: 3px solid {palette['muted']}; padding: 5px; border-radius: {radius};
+  background-image: {images}; background-size: {image_sizes}; background-repeat: {image_repeats};
+  background-position: {image_positions}; }}
 .cn-header {{ padding: 2px 5px 5px; }}
 .cn-day {{ color: {palette['accent']}; font-weight: bold; font-size: {size + 2}px; }}
 .cn-date, .cn-time {{ color: {palette['muted']}; font-size: {max(8, size - 2)}px; }}
@@ -293,12 +321,16 @@ def build_preview_css(config: Config) -> str:
     font = str(config.get("font_family", "Monospace"))
     font = "".join(character for character in font if character.isalnum() or character in " _-")
     size = int(config.get("font_size", 11))
+    radius = "8px" if config.get("rounded_corners", False) else "0"
+    image_uri = _image_uri(config)
+    background = f'url("{image_uri}")' if image_uri else palette["background"]
     return f"""
-.cn-style-preview {{ background-color: {palette['background']}; color: {palette['foreground']};
+.cn-style-preview {{ background-color: {palette['background']}; background-image: {background};
+  background-size: cover; background-position: center; color: {palette['foreground']};
   font-family: "{font or 'Monospace'}", monospace; font-size: {size}px;
-  border: 3px solid {palette['muted']}; }}
+  border: 3px solid {palette['muted']}; border-radius: {radius}; }}
 .cn-style-card {{ background-color: {palette['card']}; color: {palette['foreground']};
-  border: 2px solid {palette['muted']}; }}
+  border: 2px solid {palette['muted']}; border-radius: {radius}; }}
 .cn-style-accent {{ color: {palette['accent']}; font-weight: bold; }}
 .cn-style-apply {{ background-color: {palette['accent']}; color: {palette['background']};
   border: 2px solid {palette['foreground']}; border-radius: 0; font-weight: bold; }}

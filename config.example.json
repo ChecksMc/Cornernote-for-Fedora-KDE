@@ -18,6 +18,8 @@
   "collapse_delay_ms": 700,
   "theme_source": "plasma",
   "theme_fallback": "catppuccin_mocha",
+  "background_image": "",
+  "rounded_corners": false,
   "custom_palette": {
     "background": "#1e1e2e",
     "foreground": "#cdd6f4",
