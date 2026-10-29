@@ -211,7 +211,7 @@ class CornerNote(Gtk.Window):
         header.pack_end(date_box, False, False, 2)
         self.settings_button = Gtk.Button(label="[ ⚙ ]")
         self.settings_button.set_tooltip_text("CornerNote settings")
-        self.settings_button.connect("clicked", lambda *_: self._show_settings())
+        self.settings_button.connect("clicked", lambda *_: self._toggle_settings())
         header.pack_end(self.settings_button, False, False, 4)
         root.pack_start(header, False, False, 0)
 
@@ -329,8 +329,13 @@ class CornerNote(Gtk.Window):
         page.pack_start(heading_row, False, False, 2)
         settings_scroll = Gtk.ScrolledWindow()
         settings_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        settings_scroll.set_propagate_natural_width(False)
+        settings_scroll.set_min_content_width(0)
+        settings_scroll.set_max_content_width(max(240, int(self.config["width"]) - 16))
         self.settings_scroll = settings_scroll
         self.settings_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.settings_content.set_size_request(max(240, int(self.config["width"]) - 32), -1)
+        self.settings_content.set_hexpand(True)
         settings_scroll.add(self.settings_content)
         page.pack_start(settings_scroll, True, True, 0)
         self.setting_widgets: dict[str, Any] = {}
@@ -463,6 +468,13 @@ class CornerNote(Gtk.Window):
         self.page_stack.set_visible_child_name("settings")
         fields["default_vault_path"].grab_focus()
 
+    def _toggle_settings(self) -> None:
+        """Switch between settings and the note editor from the header button."""
+        if self.page_stack.get_visible_child_name() == "settings":
+            self._show_note_page()
+        else:
+            self._show_settings()
+
     def _show_note_page(self) -> None:
         """Return to the note editor and restore the active editing focus."""
         self.page_stack.set_visible_child_name("note")
@@ -498,6 +510,8 @@ class CornerNote(Gtk.Window):
         self.set_default_size(new_config["width"], new_config["height"])
         self.set_size_request(new_config["width"], new_config["height"])
         self.resize(new_config["width"], new_config["height"])
+        self.settings_content.set_size_request(max(240, new_config["width"] - 32), -1)
+        self.settings_scroll.set_max_content_width(max(240, new_config["width"] - 16))
         self._apply_position()
         self._refresh_folder_choices()
         self._refresh_css()
@@ -716,7 +730,6 @@ class CornerNote(Gtk.Window):
             return False
         self.pointer_inside = False
         if (not self.dropdown_open and not self.file_chooser_open and not self.state.forced_open
-                and self.page_stack.get_visible_child_name() != "settings"
                 and self.state.mode != Mode.DISCARD_CONFIRM):
             self._schedule_collapse()
         return False
@@ -764,8 +777,7 @@ class CornerNote(Gtk.Window):
             """Collapse only if no pointer or forced-open state prevents it."""
             self.collapse_source = None
             if (not self.pointer_inside and not self.dropdown_open
-                    and not self.file_chooser_open and not self.state.forced_open
-                    and self.page_stack.get_visible_child_name() != "settings"):
+                    and not self.file_chooser_open and not self.state.forced_open):
                 self.collapse()
             return GLib.SOURCE_REMOVE
 
