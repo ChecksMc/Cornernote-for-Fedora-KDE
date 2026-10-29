@@ -52,20 +52,28 @@ This manual route works across Plasma versions.
 - Press Meta+N (or your configured shortcut) to open and focus the note. The
   shortcut toggles the forced-open state.
 - Enter in the title field moves focus to the note body.
-- Choose **Vault note** to append a dated heading and draft to the configured
-  quick-notes file. Choose **Append to file** to append an entry to the Markdown
-  filepath in the title. A title ending in `.md` automatically selects append
-  mode; the **Append mode** checkbox can also select it explicitly. Relative
-  append paths resolve inside the configured vault; absolute `.md` paths are
-  also accepted.
+- Submit normally to append a dated heading and draft to the configured
+  quick-notes file. To append to another Markdown file, enter its path as the
+  title or enable **Append mode**. A title ending in `.md` automatically
+  selects append mode. Relative append paths resolve inside the configured
+  vault; absolute `.md` paths are also accepted.
 - Choose **No date** to omit the date from the saved heading. Typing `none` in
   the date field does the same. Custom dates such as `tomorrow` or `14.10` are
   still supported.
-- Ctrl+Enter submits using the selected mode.
+- Ctrl+Enter submits using the active mode.
+- Ctrl+D toggles between a date and no date. Ctrl+Shift+D opens the date menu.
+- Ctrl+Shift+A toggles append mode. Ctrl+Shift+F opens a Markdown-only picker
+  to search for and append to an existing note in the vault.
+- Ctrl+S toggles settings. The gear button also closes settings and returns to
+  the editor. Settings collapse when the pointer leaves the overlay.
+- In the note body, Ctrl+1 inserts a level-one heading, Ctrl+B wraps text in
+  bold markers, Ctrl+I wraps text in italic markers, and Ctrl+U wraps text in
+  an HTML underline tag.
 - Escape opens an inline discard confirmation. Confirm with Y/Yes or cancel
   with N/No/Escape.
-- The gear button opens settings for the vault, filename/date format, timing,
-  tab peek, and color source. Changes save to the user config immediately.
+- The gear button toggles between the editor and settings for the vault,
+  filename/date format, timing, tab peek, and appearance. Appearance changes
+  are saved with **Apply style**; other settings save with **Save settings**.
 
 Collapsing the overlay never clears a draft. A draft is cleared only after a
 successful write or a confirmed discard. Write failures remain visible in the
@@ -74,9 +82,10 @@ overlay and preserve the text for retry.
 ## Configuration
 
 Open the overlay and press the gear button for the in-app settings page, or
-edit `~/.config/cornernote/config.json`. Settings are written atomically. The
-full template and defaults are in
-[`config.example.json`](config.example.json). `note_filename` supports
+edit `${XDG_CONFIG_HOME:-~/.config}/cornernote/config.json` (normally
+`~/.config/cornernote/config.json`). If `CORNERNOTE_CONFIG` is set, that file
+is used instead. Settings are written atomically. The full template and
+defaults are in [`config.example.json`](config.example.json). `note_filename` supports
 `{date}` and `{title}` substitutions, for example `QuickNotes.md` or
 `{date}.md`. Date tags accept `today`, `tomorrow`, weekday names, `in N days`,
 and common numeric date forms. Position uses `position_horizontal` and
