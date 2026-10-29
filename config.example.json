@@ -1,0 +1,22 @@
+{
+  "width": 380,
+  "height": 340,
+  "idle_fraction": 0.04,
+  "margin_right": 20,
+  "position_horizontal": "right",
+  "position_vertical": "top",
+  "offset_x": 0,
+  "offset_y": 0,
+  "monitor": "primary",
+  "socket_path": "${XDG_RUNTIME_DIR}/cornernote.sock",
+  "default_vault_path": "~/Documents",
+  "note_filename": "QuickNotes.md",
+  "date_format": "%Y-%m-%d",
+  "font_family": "Monospace",
+  "font_size": 11,
+  "anim_ms": 320,
+  "collapse_delay_ms": 700,
+  "theme_source": "plasma",
+  "theme_fallback": "catppuccin_mocha",
+  "folders": []
+}

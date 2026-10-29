@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CornerNote
+Comment=Pixel-art quick-note overlay
+Exec=corner-note toggle
+Icon=accessories-text-editor
+Terminal=false
+Categories=Utility;TextEditor;
+NoDisplay=false
+X-KDE-StartupNotify=false

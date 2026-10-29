@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Send a toggle command to the running CornerNote daemon."""
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+from ipc import send_command
+from style import CONFIG_PATH, load_config
+
+
+def main() -> int:
+    """Parse the toggle command and contact the running daemon."""
+    parser = argparse.ArgumentParser(prog="corner-note", description="Toggle the CornerNote overlay")
+    parser.add_argument("command", nargs="?", choices=("toggle",), default="toggle")
+    args = parser.parse_args()
+    try:
+        config = load_config(os.environ.get("CORNERNOTE_CONFIG", CONFIG_PATH))
+        send_command(config["socket_path"], args.command)
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"corner-note: {exc}\nStart the daemon with: systemctl --user start cornernote",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
