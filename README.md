@@ -73,7 +73,8 @@ This manual route works across Plasma versions.
   with N/No/Escape.
 - The gear button toggles between the editor and settings for the vault,
   filename/date format, timing, tab peek, and appearance. Appearance changes
-  are saved with **Apply style**; other settings save with **Save settings**.
+  are saved with **Apply style**; **Save settings** saves the other settings
+  and returns to the editor.
 
 Collapsing the overlay never clears a draft. A draft is cleared only after a
 successful write or a confirmed discard. Write failures remain visible in the

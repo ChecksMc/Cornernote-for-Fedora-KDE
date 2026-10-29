@@ -79,7 +79,7 @@ class StyleEditor(Gtk.Box):
         self._add_control(grid, 7, "Font family", self.font_button)
         self.font_size = Gtk.SpinButton.new_with_range(8, 28, 1)
         self.font_size.set_numeric(True)
-        self.font_size.connect("value-changed", self._on_font_changed)
+        self.font_size.connect("value-changed", self._on_font_size_changed)
         self._add_control(grid, 8, "Font size", self.font_size)
 
         image_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -127,11 +127,13 @@ class StyleEditor(Gtk.Box):
 
     def _add_control(self, grid: Gtk.Grid, row: int, label: str,
                      widget: Gtk.Widget) -> None:
-        """Attach a labeled control to the editor grid."""
+        """Place each appearance control below its label at full available width."""
         text = Gtk.Label(label=label, xalign=0)
-        text.set_size_request(145, -1)
-        grid.attach(text, 0, row, 1, 1)
-        grid.attach(widget, 1, row, 1, 1)
+        text.set_halign(Gtk.Align.START)
+        widget.set_hexpand(True)
+        widget.set_halign(Gtk.Align.FILL)
+        grid.attach(text, 0, row * 2, 2, 1)
+        grid.attach(widget, 0, row * 2 + 1, 2, 1)
 
     def _load_config(self) -> None:
         """Populate all editor controls from the saved configuration."""
@@ -231,6 +233,11 @@ class StyleEditor(Gtk.Box):
         self.source_combo.set_active_id("custom")
         self._update_enabled_controls()
         self._refresh_preview()
+
+    def _on_font_size_changed(self, _widget: Gtk.Widget) -> None:
+        """Refresh the live preview after the font size changes."""
+        if not self._loading:
+            self._refresh_preview()
 
     def _on_choose_font(self, _button: Gtk.Button) -> None:
         """Open a managed GTK font chooser and refresh the selected family."""

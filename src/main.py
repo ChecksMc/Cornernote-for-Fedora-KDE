@@ -73,6 +73,7 @@ class CornerNote(Gtk.Window):
         LayerShell.set_keyboard_interactivity(self, False)
 
         self._build_ui()
+        self._install_accelerators()
         self._install_css()
         self.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
         self.connect("enter-notify-event", self._on_enter)
@@ -126,14 +127,10 @@ class CornerNote(Gtk.Window):
             monitor = display.get_monitor(index)
             if monitor is None:
                 continue
-            geometry = monitor.get_geometry()
-            manufacturer = monitor.get_manufacturer() or ""
-            model = monitor.get_model() or "Display"
-            model_name = " ".join(part for part in (manufacturer, model) if part).strip()
             primary = monitor.is_primary()
-            label = f"Screen {index + 1}: {model_name} · {geometry.width}×{geometry.height}"
+            label = f"Screen {index + 1}"
             if primary:
-                label += " · primary"
+                label += " (primary)"
             combo.append(str(index), label)
         if count == 0:
             combo.append("primary", "Primary display")
@@ -344,11 +341,13 @@ class CornerNote(Gtk.Window):
 
         def add_row(group_grid: Gtk.Grid, row: int, label: str,
                     key: str, widget: Any) -> None:
-            """Add one labeled setting to its group grid."""
+            """Place a setting label above a full-width input control."""
             text = Gtk.Label(label=label, xalign=0)
-            text.set_size_request(112, -1)
-            group_grid.attach(text, 0, row, 1, 1)
-            group_grid.attach(widget, 1, row, 1, 1)
+            text.set_halign(Gtk.Align.START)
+            widget.set_hexpand(True)
+            widget.set_halign(Gtk.Align.FILL)
+            group_grid.attach(text, 0, row * 2, 2, 1)
+            group_grid.attach(widget, 0, row * 2 + 1, 2, 1)
             self.setting_widgets[key] = widget
 
         display_grid = make_group("Display and position", True)
@@ -473,8 +472,8 @@ class CornerNote(Gtk.Window):
         self.page_stack.set_visible_child_name("note")
         (self.content_view if self.state.mode == Mode.CONTENT else self.title_entry).grab_focus()
 
-    def _save_settings(self) -> None:
-        """Validate and persist settings before applying them to the window."""
+    def _save_settings(self) -> bool:
+        """Validate, persist, and close settings after a successful save."""
         fields = self.setting_widgets
         new_config = dict(self.config)
         new_config["default_vault_path"] = os.path.expanduser(
@@ -493,12 +492,12 @@ class CornerNote(Gtk.Window):
         new_config["monitor"] = fields["monitor"].get_active_id() or "primary"
         if not new_config["default_vault_path"] or not new_config["note_filename"].endswith(".md"):
             self.settings_status.set_text("Enter a vault path and a .md filename.")
-            return
+            return False
         try:
             save_config(new_config, self.config_path)
         except OSError as exc:
             self.settings_status.set_text(f"Could not save settings: {exc}")
-            return
+            return False
         self.config.update(new_config)
         self.set_default_size(new_config["width"], new_config["height"])
         self.set_size_request(new_config["width"], new_config["height"])
@@ -509,6 +508,8 @@ class CornerNote(Gtk.Window):
         self._refresh_folder_choices()
         self._refresh_css()
         self.settings_status.set_text("Settings saved.")
+        self._show_note_page()
+        return True
 
     def _open_style_editor(self) -> None:
         """Expand and reveal the embedded appearance controls."""
@@ -813,11 +814,10 @@ class CornerNote(Gtk.Window):
         self.force_close() if self.state.forced_open else self.force_open()
 
     def _on_key(self, _widget: Any, event: Any) -> bool:
-        """Handle editor, date, search, settings, and Markdown shortcuts."""
+        """Handle shortcuts directly when GTK does not activate an accelerator."""
         key = event.keyval
-        modifiers = event.state
-        control = bool(modifiers & Gdk.ModifierType.CONTROL_MASK)
-        shift = bool(modifiers & Gdk.ModifierType.SHIFT_MASK)
+        control = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
         if self.state.mode == Mode.DISCARD_CONFIRM:
             if key in (Gdk.KEY_y, Gdk.KEY_Y):
                 self._resolve_discard(True)
@@ -831,38 +831,98 @@ class CornerNote(Gtk.Window):
             self._open_search_mode()
             return True
         if control and shift and key in (Gdk.KEY_d, Gdk.KEY_D):
-            self.date_mode_combo.grab_focus()
-            self.date_mode_combo.popup()
+            self._open_date_menu()
             return True
         if control and shift and key in (Gdk.KEY_a, Gdk.KEY_A):
-            self._set_append_mode(not self.append_mode_check.get_active())
+            self._toggle_append_mode()
             return True
         if control and key in (Gdk.KEY_d, Gdk.KEY_D):
-            no_date = self.date_mode_combo.get_active_id() != "none"
-            self.date_mode_combo.set_active_id("none" if no_date else "date")
-            if not no_date and not self.date_entry.get_text().strip():
-                self.date_entry.set_text("today")
+            self._toggle_date_mode()
             return True
+        if control and key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            if self.page_stack.get_visible_child_name() == "note":
+                self.commit_note()
+                return True
+        if control and key in (Gdk.KEY_1, Gdk.KEY_KP_1):
+            if self._body_has_focus():
+                self._insert_heading_marker()
+                return True
+        if control and key in (Gdk.KEY_b, Gdk.KEY_B):
+            self._wrap_if_editing("**")
+            return self._body_has_focus()
+        if control and key in (Gdk.KEY_i, Gdk.KEY_I):
+            self._wrap_if_editing("*")
+            return self._body_has_focus()
+        if control and key in (Gdk.KEY_u, Gdk.KEY_U):
+            self._wrap_if_editing("<u>", "</u>")
+            return self._body_has_focus()
         if key == Gdk.KEY_Escape:
             self._open_discard_prompt()
             return True
-        if key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and control:
-            self.commit_note()
-            return True
-        if control and self.page_stack.get_visible_child_name() == "note":
-            if key in (Gdk.KEY_1, Gdk.KEY_KP_1):
-                self._insert_heading_marker()
-                return True
-            if key in (Gdk.KEY_b, Gdk.KEY_B):
-                self._wrap_selection("**")
-                return True
-            if key in (Gdk.KEY_i, Gdk.KEY_I):
-                self._wrap_selection("*")
-                return True
-            if key in (Gdk.KEY_u, Gdk.KEY_U):
-                self._wrap_selection("<u>", "</u>")
-                return True
         return False
+
+    def _install_accelerators(self) -> None:
+        """Register Ctrl shortcuts before focused GTK inputs process key events."""
+        self.accel_group = Gtk.AccelGroup()
+        self.add_accel_group(self.accel_group)
+        control = Gdk.ModifierType.CONTROL_MASK
+        shift = Gdk.ModifierType.SHIFT_MASK
+        bindings: tuple[tuple[int, Gdk.ModifierType, Any], ...] = (
+            (Gdk.KEY_s, control, self._toggle_settings),
+            (Gdk.KEY_F, control | shift, self._open_search_mode),
+            (Gdk.KEY_D, control | shift, self._open_date_menu),
+            (Gdk.KEY_A, control | shift, self._toggle_append_mode),
+            (Gdk.KEY_d, control, self._toggle_date_mode),
+            (Gdk.KEY_Return, control, self.commit_note),
+            (Gdk.KEY_KP_Enter, control, self.commit_note),
+            (Gdk.KEY_1, control, self._insert_heading_if_editing),
+            (Gdk.KEY_b, control, lambda: self._wrap_if_editing("**")),
+            (Gdk.KEY_i, control, lambda: self._wrap_if_editing("*")),
+            (Gdk.KEY_u, control, lambda: self._wrap_if_editing("<u>", "</u>")),
+        )
+        for keyval, modifiers, callback in bindings:
+            self.accel_group.connect(
+                keyval, modifiers, Gtk.AccelFlags.VISIBLE,
+                self._accelerator_callback(callback))
+
+    def _accelerator_callback(self, callback: Any) -> Any:
+        """Adapt a no-argument action to the GTK accelerator closure signature."""
+        def activate(*_args: Any) -> bool:
+            callback()
+            return True
+
+        return activate
+
+    def _open_date_menu(self) -> None:
+        """Focus and open the date selection menu."""
+        self.date_mode_combo.grab_focus()
+        self.date_mode_combo.popup()
+
+    def _toggle_append_mode(self) -> None:
+        """Toggle append mode from its keyboard shortcut."""
+        self._set_append_mode(not self.append_mode_check.get_active())
+
+    def _toggle_date_mode(self) -> None:
+        """Toggle between today's date and no date."""
+        set_no_date = self.date_mode_combo.get_active_id() != "none"
+        self.date_mode_combo.set_active_id("none" if set_no_date else "date")
+        if not set_no_date and self.date_entry.get_text().strip().casefold() == "none":
+            self.date_entry.set_text("today")
+
+    def _body_has_focus(self) -> bool:
+        """Return whether body-formatting shortcuts have a valid target."""
+        return (self.page_stack.get_visible_child_name() == "note"
+                and self.get_focus() == self.content_view)
+
+    def _wrap_if_editing(self, prefix: str, suffix: str | None = None) -> None:
+        """Apply Markdown delimiters only while the note body has focus."""
+        if self._body_has_focus():
+            self._wrap_selection(prefix, suffix)
+
+    def _insert_heading_if_editing(self) -> None:
+        """Insert a heading marker only while the note body has focus."""
+        if self._body_has_focus():
+            self._insert_heading_marker()
 
     def _open_search_mode(self) -> None:
         """Show a Markdown-only picker for selecting an existing vault note."""
