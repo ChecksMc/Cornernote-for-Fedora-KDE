@@ -313,9 +313,6 @@ class CornerNote(Gtk.Window):
         heading = Gtk.Label(label="CornerNote Settings", xalign=0)
         heading.get_style_context().add_class("cn-day")
         heading_row.pack_start(heading, True, True, 2)
-        style_button = Gtk.Button(label="[ Appearance ]")
-        style_button.connect("clicked", lambda *_: self._open_style_editor())
-        heading_row.pack_end(style_button, False, False, 0)
         page.pack_start(heading_row, False, False, 2)
         settings_scroll = Gtk.ScrolledWindow()
         settings_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -424,17 +421,6 @@ class CornerNote(Gtk.Window):
         page.pack_end(actions, False, False, 0)
         self.page_stack.add_named(page, "settings")
 
-    def _scroll_to_appearance(self) -> bool:
-        """Scroll the settings pane so the embedded appearance controls show."""
-        adjustment = self.settings_scroll.get_vadjustment()
-        coordinates = self.appearance_expander.translate_coordinates(
-            self.settings_content, 0, 0)
-        if coordinates and coordinates[0]:
-            adjustment.set_value(max(0.0, float(coordinates[2])))
-        else:
-            adjustment.set_value(max(0.0, adjustment.get_upper() - adjustment.get_page_size()))
-        return GLib.SOURCE_REMOVE
-
     def _show_settings(self) -> None:
         """Populate setting controls from the active configuration."""
         self.style_editor.set_config(self.config)
@@ -510,11 +496,6 @@ class CornerNote(Gtk.Window):
         self.settings_status.set_text("Settings saved.")
         self._show_note_page()
         return True
-
-    def _open_style_editor(self) -> None:
-        """Expand and reveal the embedded appearance controls."""
-        self.appearance_expander.set_expanded(True)
-        GLib.idle_add(self._scroll_to_appearance)
 
     def _apply_style_config(self, updated: Config) -> None:
         """Persist appearance settings and refresh the overlay stylesheet."""
