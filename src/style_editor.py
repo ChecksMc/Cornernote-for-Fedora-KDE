@@ -246,19 +246,21 @@ class StyleEditor(Gtk.Box):
             buttons=("Cancel", Gtk.ResponseType.CANCEL,
                      "Select", Gtk.ResponseType.ACCEPT))
         dialog.set_modal(True)
-        dialog.set_font_name(self.font_name)
+        dialog.set_font(self.font_name)
         self.on_chooser_changed(True)
 
         def response(chooser: Gtk.FontChooserDialog, result: int) -> None:
             """Apply the chosen font family to the preview controls."""
-            if result == Gtk.ResponseType.ACCEPT:
-                font_description = Pango.FontDescription.from_string(
-                    chooser.get_font_name() or "Monospace")
-                self.font_name = font_description.get_family() or "Monospace"
-                self.font_button.set_label(self.font_name)
-                self._refresh_preview()
-            self.on_chooser_changed(False)
-            chooser.destroy()
+            try:
+                if result == Gtk.ResponseType.ACCEPT:
+                    font_description = Pango.FontDescription.from_string(
+                        chooser.get_font() or "Monospace")
+                    self.font_name = font_description.get_family() or "Monospace"
+                    self.font_button.set_label(self.font_name)
+                    self._refresh_preview()
+            finally:
+                self.on_chooser_changed(False)
+                chooser.destroy()
 
         dialog.connect("response", response)
         self.active_font_chooser = dialog
