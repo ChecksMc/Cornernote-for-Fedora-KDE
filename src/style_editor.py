@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from gi.repository import Gdk, Gtk, Pango
+import gi
+
+gi.require_version("PangoCairo", "1.0")
+from gi.repository import Gdk, Gtk, PangoCairo
 
 from style import Config, PALETTES, build_preview_css, get_palette, palette_options
 
@@ -35,7 +38,7 @@ class StyleEditor(Gtk.Box):
         self.color_buttons: dict[str, Gtk.ColorButton] = {}
         self.preview_provider: Gtk.CssProvider | None = None
 
-        self.set_border_width(10)
+        self.set_border_width(0)
         self._build_ui()
         self._load_config()
 
@@ -47,7 +50,7 @@ class StyleEditor(Gtk.Box):
         heading.get_style_context().add_class("cn-style-heading")
         outer.pack_start(heading, False, False, 0)
 
-        grid = Gtk.Grid(column_spacing=10, row_spacing=7)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=6)
         outer.pack_start(grid, False, False, 0)
 
         self.source_combo = Gtk.ComboBoxText()
@@ -74,22 +77,32 @@ class StyleEditor(Gtk.Box):
             self.color_buttons[key] = color_button
             self._add_control(grid, row, label, color_button)
 
-        self.font_button = Gtk.Button(label="Choose font…")
-        self.font_button.connect("clicked", self._on_choose_font)
-        self._add_control(grid, 7, "Font family", self.font_button)
+        self.font_combo = Gtk.ComboBoxText.new_with_entry()
+        self.font_combo.set_entry_text_column(0)
+        self.font_combo.connect("notify::popup-shown", self.on_popup_changed)
+        self.font_entry = self.font_combo.get_child()
+        font_map = PangoCairo.FontMap.get_default()
+        self.font_families = tuple(
+            sorted(family.get_name() for family in font_map.list_families()))
+        for family in self.font_families:
+            self.font_combo.append_text(family)
+        self.font_entry.connect("changed", self._on_font_changed)
+        self._add_control(grid, 7, "Font family", self.font_combo)
         self.font_size = Gtk.SpinButton.new_with_range(8, 28, 1)
         self.font_size.set_numeric(True)
         self.font_size.connect("value-changed", self._on_font_size_changed)
         self._add_control(grid, 8, "Font size", self.font_size)
 
-        image_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        image_row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
         self.image_entry = Gtk.Entry()
         self.image_entry.set_placeholder_text("Optional local backdrop image")
         self.image_entry.connect("changed", self._on_image_changed)
         image_row.pack_start(self.image_entry, True, True, 0)
+        image_actions = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         browse = Gtk.Button(label="Browse…")
         browse.connect("clicked", self._on_browse_image)
-        image_row.pack_end(browse, False, False, 0)
+        image_actions.pack_end(browse, False, False, 0)
+        image_row.pack_start(image_actions, False, False, 0)
         self._add_control(grid, 9, "Backdrop image", image_row)
 
         self.rounded_toggle = Gtk.CheckButton(label="Use rounded paper corners")
@@ -146,7 +159,10 @@ class StyleEditor(Gtk.Box):
             rgba.parse(str(current_palette.get(key, PALETTES["catppuccin_mocha"][key])))
             button.set_rgba(rgba)
         self.font_name = str(self.config.get("font_family", "Monospace"))
-        self.font_button.set_label(self.font_name)
+        if self.font_name not in self.font_families:
+            self.font_combo.append_text(self.font_name)
+            self.font_families += (self.font_name,)
+        self.font_entry.set_text(self.font_name)
         self.font_size.set_value(int(self.config.get("font_size", 11)))
         self.image_entry.set_text(str(self.config.get("background_image", "")))
         self.rounded_toggle.set_active(bool(self.config.get("rounded_corners", False)))
@@ -175,7 +191,7 @@ class StyleEditor(Gtk.Box):
         config["theme_source"] = self.source_combo.get_active_id() or "plasma"
         config["theme_fallback"] = self.palette_combo.get_active_id() or "catppuccin_mocha"
         config["custom_palette"] = self._current_palette()
-        config["font_family"] = self.font_name or "Monospace"
+        config["font_family"] = self.font_entry.get_text().strip() or "Monospace"
         config["font_size"] = self.font_size.get_value_as_int()
         config["background_image"] = self.image_entry.get_text().strip()
         config["rounded_corners"] = self.rounded_toggle.get_active()
@@ -239,32 +255,11 @@ class StyleEditor(Gtk.Box):
         if not self._loading:
             self._refresh_preview()
 
-    def _on_choose_font(self, _button: Gtk.Button) -> None:
-        """Open a managed GTK font chooser and refresh the selected family."""
-        dialog = Gtk.FontChooserDialog(
-            title="Select CornerNote font", parent=self.get_toplevel(),
-            buttons=("Cancel", Gtk.ResponseType.CANCEL,
-                     "Select", Gtk.ResponseType.ACCEPT))
-        dialog.set_modal(True)
-        dialog.set_font(self.font_name)
-        self.on_chooser_changed(True)
-
-        def response(chooser: Gtk.FontChooserDialog, result: int) -> None:
-            """Apply the chosen font family to the preview controls."""
-            try:
-                if result == Gtk.ResponseType.ACCEPT:
-                    font_description = Pango.FontDescription.from_string(
-                        chooser.get_font() or "Monospace")
-                    self.font_name = font_description.get_family() or "Monospace"
-                    self.font_button.set_label(self.font_name)
-                    self._refresh_preview()
-            finally:
-                self.on_chooser_changed(False)
-                chooser.destroy()
-
-        dialog.connect("response", response)
-        self.active_font_chooser = dialog
-        dialog.show_all()
+    def _on_font_changed(self, _entry: Gtk.Entry) -> None:
+        """Refresh the live preview when a font family is selected or typed."""
+        if not self._loading:
+            self.font_name = self.font_entry.get_text().strip() or "Monospace"
+            self._refresh_preview()
 
     def _on_image_changed(self, _entry: Gtk.Entry) -> None:
         """Refresh the backdrop preview when its image path changes."""
