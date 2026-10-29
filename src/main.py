@@ -288,13 +288,6 @@ class CornerNote(Gtk.Window):
         self.status_label = Gtk.Label(xalign=0)
         self.status_label.get_style_context().add_class("cn-status")
         footer.pack_start(self.status_label, True, True, 0)
-        self.submit_mode_combo = Gtk.ComboBoxText()
-        self.submit_mode_combo.append("note", "Vault note")
-        self.submit_mode_combo.append("append", "Append to file")
-        self.submit_mode_combo.set_active_id("note")
-        self.submit_mode_combo.set_tooltip_text("Choose how this draft is submitted")
-        self.submit_mode_combo.connect("changed", self._on_submit_mode_changed)
-        footer.pack_end(self.submit_mode_combo, False, False, 0)
         self.save_button = Gtk.Button(label="[ Submit · Ctrl+Enter ]")
         self.save_button.get_style_context().add_class("cn-save")
         self.save_button.connect("clicked", lambda *_: self.commit_note())
@@ -666,10 +659,9 @@ class CornerNote(Gtk.Window):
         self._sync_draft()
 
     def _set_append_mode(self, enabled: bool) -> None:
-        """Keep the append checkbox and submit selector synchronized."""
+        """Set the single append-mode control and synchronize the draft."""
         self._updating_append_controls = True
         self.append_mode_check.set_active(enabled)
-        self.submit_mode_combo.set_active_id("append" if enabled else "note")
         self._updating_append_controls = False
         self._sync_draft()
 
@@ -677,11 +669,6 @@ class CornerNote(Gtk.Window):
         """Mirror checkbox changes in the submit mode selector."""
         if not self._updating_append_controls:
             self._set_append_mode(self.append_mode_check.get_active())
-
-    def _on_submit_mode_changed(self, combo: Gtk.ComboBoxText) -> None:
-        """Mirror the selected submit action in the append checkbox."""
-        if not self._updating_append_controls:
-            self._set_append_mode(combo.get_active_id() == "append")
 
     def _on_date_mode_changed(self, combo: Gtk.ComboBoxText) -> None:
         """Set the date field to an explicit date or the no-date value."""
@@ -826,22 +813,122 @@ class CornerNote(Gtk.Window):
         self.force_close() if self.state.forced_open else self.force_open()
 
     def _on_key(self, _widget: Any, event: Any) -> bool:
-        """Handle confirmation, escape, and Ctrl+Enter shortcuts."""
+        """Handle editor, date, search, settings, and Markdown shortcuts."""
         key = event.keyval
         modifiers = event.state
+        control = bool(modifiers & Gdk.ModifierType.CONTROL_MASK)
+        shift = bool(modifiers & Gdk.ModifierType.SHIFT_MASK)
         if self.state.mode == Mode.DISCARD_CONFIRM:
             if key in (Gdk.KEY_y, Gdk.KEY_Y):
                 self._resolve_discard(True)
             elif key in (Gdk.KEY_n, Gdk.KEY_N, Gdk.KEY_Escape):
                 self._resolve_discard(False)
             return True
+        if control and key in (Gdk.KEY_s, Gdk.KEY_S):
+            self._toggle_settings()
+            return True
+        if control and shift and key in (Gdk.KEY_f, Gdk.KEY_F):
+            self._open_search_mode()
+            return True
+        if control and shift and key in (Gdk.KEY_d, Gdk.KEY_D):
+            self.date_mode_combo.grab_focus()
+            self.date_mode_combo.popup()
+            return True
+        if control and shift and key in (Gdk.KEY_a, Gdk.KEY_A):
+            self._set_append_mode(not self.append_mode_check.get_active())
+            return True
+        if control and key in (Gdk.KEY_d, Gdk.KEY_D):
+            no_date = self.date_mode_combo.get_active_id() != "none"
+            self.date_mode_combo.set_active_id("none" if no_date else "date")
+            if not no_date and not self.date_entry.get_text().strip():
+                self.date_entry.set_text("today")
+            return True
         if key == Gdk.KEY_Escape:
             self._open_discard_prompt()
             return True
-        if key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and modifiers & Gdk.ModifierType.CONTROL_MASK:
+        if key in (Gdk.KEY_Return, Gdk.KEY_KP_Enter) and control:
             self.commit_note()
             return True
+        if control and self.page_stack.get_visible_child_name() == "note":
+            if key in (Gdk.KEY_1, Gdk.KEY_KP_1):
+                self._insert_heading_marker()
+                return True
+            if key in (Gdk.KEY_b, Gdk.KEY_B):
+                self._wrap_selection("**")
+                return True
+            if key in (Gdk.KEY_i, Gdk.KEY_I):
+                self._wrap_selection("*")
+                return True
+            if key in (Gdk.KEY_u, Gdk.KEY_U):
+                self._wrap_selection("<u>", "</u>")
+                return True
         return False
+
+    def _open_search_mode(self) -> None:
+        """Show a Markdown-only picker for selecting an existing vault note."""
+        vault = Path(self.config["default_vault_path"]).expanduser()
+        dialog = Gtk.FileChooserDialog(
+            title="Search Markdown notes", parent=self,
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=("Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.ACCEPT))
+        dialog.set_modal(True)
+        if vault.is_dir():
+            dialog.set_current_folder(str(vault))
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Markdown notes (*.md)")
+        file_filter.add_pattern("*.md")
+        file_filter.add_pattern("*.MD")
+        dialog.add_filter(file_filter)
+        self.file_chooser_open = True
+
+        def response(chooser: Gtk.FileChooserDialog, result: int) -> None:
+            """Use the selected vault note as the append destination."""
+            self.file_chooser_open = False
+            filename = chooser.get_filename() if result == Gtk.ResponseType.ACCEPT else None
+            if filename:
+                selected = Path(filename)
+                try:
+                    title = selected.relative_to(vault).as_posix()
+                except ValueError:
+                    title = str(selected)
+                self.title_entry.set_text(title)
+                self._set_append_mode(True)
+                self.state.begin_content()
+                self.content_view.grab_focus()
+            chooser.destroy()
+            if not self.pointer_inside and not self.state.forced_open:
+                self._schedule_collapse()
+
+        dialog.connect("response", response)
+        self.active_search_dialog = dialog
+        dialog.show_all()
+
+    def _wrap_selection(self, prefix: str, suffix: str | None = None) -> None:
+        """Wrap selected Markdown body text or place the cursor between markers."""
+        closing = suffix if suffix is not None else prefix
+        selection = self.content_buffer.get_selection_bounds()
+        if selection:
+            start, end = selection
+            selected = self.content_buffer.get_text(start, end, True)
+            self.content_buffer.delete(start, end)
+            self.content_buffer.insert(start, f"{prefix}{selected}{closing}")
+            self.content_buffer.place_cursor(start)
+            return
+        self.content_buffer.insert_at_cursor(f"{prefix}{closing}")
+        cursor = self.content_buffer.get_iter_at_mark(self.content_buffer.get_insert())
+        cursor.backward_chars(len(closing))
+        self.content_buffer.place_cursor(cursor)
+
+    def _insert_heading_marker(self) -> None:
+        """Prefix the current body line with a level-one Markdown heading."""
+        cursor = self.content_buffer.get_iter_at_mark(self.content_buffer.get_insert())
+        line_start = cursor.copy()
+        line_start.set_line_offset(0)
+        line_end = line_start.copy()
+        line_end.forward_to_line_end()
+        line = self.content_buffer.get_text(line_start, line_end, True)
+        if not line.startswith("# "):
+            self.content_buffer.insert(line_start, "# ")
 
     def _open_discard_prompt(self) -> None:
         """Ask for confirmation before clearing a nonempty draft."""
