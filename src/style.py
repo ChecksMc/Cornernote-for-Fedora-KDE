@@ -295,6 +295,7 @@ def build_css(config: Config) -> str:
     return f"""
 window, .corner-note-root {{ background-color: {palette['background']}; color: {palette['foreground']};
   font-family: "{font or 'Monospace'}", monospace; font-size: {size}px; border-radius: {radius}; }}
+.corner-note-root, .corner-note-root * {{ font-family: "{font or 'Monospace'}", monospace; }}
 .corner-note-root {{ border: 3px solid {palette['muted']}; padding: 5px; border-radius: {radius};
   background-image: {images}; background-size: {image_sizes}; background-repeat: {image_repeats};
   background-position: {image_positions}; }}
@@ -325,6 +326,7 @@ def build_preview_css(config: Config) -> str:
     image_uri = _image_uri(config)
     background = f'url("{image_uri}")' if image_uri else "none"
     return f"""
+.cn-style-preview, .cn-style-preview * {{ font-family: "{font or 'Monospace'}", monospace; }}
 .cn-style-preview {{ background-color: {palette['background']}; background-image: {background};
   background-size: cover; background-position: center; color: {palette['foreground']};
   font-family: "{font or 'Monospace'}", monospace; font-size: {size}px;

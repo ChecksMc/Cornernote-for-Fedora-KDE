@@ -405,7 +405,8 @@ class CornerNote(Gtk.Window):
 
         self.appearance_expander = Gtk.Expander(label="Appearance and style")
         self.style_editor = StyleEditor(self.config, self._apply_style_config,
-                                        self._on_folder_popup)
+                                        self._on_folder_popup,
+                                        self._on_style_chooser_changed)
         self.appearance_expander.add(self.style_editor)
         self.settings_content.pack_start(self.appearance_expander, False, False, 0)
 
@@ -536,6 +537,14 @@ class CornerNote(Gtk.Window):
         dialog.connect("response", response)
         self.active_folder_chooser = dialog
         dialog.show()
+
+    def _on_style_chooser_changed(self, opened: bool) -> None:
+        """Prevent pointer-leave collapse while the appearance picker is open."""
+        self.file_chooser_open = opened
+        if opened:
+            self._cancel_collapse()
+        elif not self.pointer_inside and not self.state.forced_open:
+            self._schedule_collapse()
 
     def _refresh_folder_choices(self) -> None:
         """Refresh the optional direct-child vault folder selector."""

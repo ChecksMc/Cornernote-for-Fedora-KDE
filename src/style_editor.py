@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, cast
+from pathlib import Path
+from typing import Any, Callable
 
-from gi.repository import Gdk, Gtk
+from gi.repository import Gdk, Gtk, Pango
 
 from style import Config, PALETTES, build_preview_css, get_palette, palette_options
 
@@ -21,12 +22,14 @@ class StyleEditor(Gtk.Box):
     """Embed theme, color, image, and font controls in the settings page."""
 
     def __init__(self, config: Config, on_apply: Callable[[Config], None],
-                 on_popup_changed: Callable[[Any, Any], None]) -> None:
+                 on_popup_changed: Callable[[Any, Any], None],
+                 on_chooser_changed: Callable[[bool], None]) -> None:
         """Create an inline editor and connect popup visibility handling."""
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.config = dict(config)
         self.on_apply = on_apply
         self.on_popup_changed = on_popup_changed
+        self.on_chooser_changed = on_chooser_changed
         self._loading = False
         self.color_buttons: dict[str, Gtk.ColorButton] = {}
         self.preview_provider: Gtk.CssProvider | None = None
@@ -70,9 +73,10 @@ class StyleEditor(Gtk.Box):
             self.color_buttons[key] = color_button
             self._add_control(grid, row, label, color_button)
 
-        self.font_entry = Gtk.Entry()
-        self.font_entry.connect("changed", self._on_font_changed)
-        self._add_control(grid, 7, "Font family", self.font_entry)
+        self.font_button = Gtk.FontButton()
+        self.font_button.set_use_size(False)
+        self.font_button.connect("font-set", self._on_font_changed)
+        self._add_control(grid, 7, "Font family", self.font_button)
         self.font_size = Gtk.SpinButton.new_with_range(8, 28, 1)
         self.font_size.set_numeric(True)
         self.font_size.connect("value-changed", self._on_font_changed)
@@ -139,7 +143,7 @@ class StyleEditor(Gtk.Box):
             rgba = Gdk.RGBA()
             rgba.parse(str(current_palette.get(key, PALETTES["catppuccin_mocha"][key])))
             button.set_rgba(rgba)
-        self.font_entry.set_text(str(self.config.get("font_family", "Monospace")))
+        self.font_button.set_font_name(str(self.config.get("font_family", "Monospace")))
         self.font_size.set_value(int(self.config.get("font_size", 11)))
         self.image_entry.set_text(str(self.config.get("background_image", "")))
         self.rounded_toggle.set_active(bool(self.config.get("rounded_corners", False)))
@@ -168,7 +172,9 @@ class StyleEditor(Gtk.Box):
         config["theme_source"] = self.source_combo.get_active_id() or "plasma"
         config["theme_fallback"] = self.palette_combo.get_active_id() or "catppuccin_mocha"
         config["custom_palette"] = self._current_palette()
-        config["font_family"] = self.font_entry.get_text().strip() or "Monospace"
+        font_name = self.font_button.get_font_name() or "Monospace"
+        font_description = Pango.FontDescription.from_string(font_name)
+        config["font_family"] = font_description.get_family() or "Monospace"
         config["font_size"] = self.font_size.get_value_as_int()
         config["background_image"] = self.image_entry.get_text().strip()
         config["rounded_corners"] = self.rounded_toggle.get_active()
@@ -228,7 +234,7 @@ class StyleEditor(Gtk.Box):
         self._refresh_preview()
 
     def _on_font_changed(self, _widget: Gtk.Widget) -> None:
-        """Update the preview after a font setting changes."""
+        """Update the preview after the selected installed font changes."""
         if not self._loading:
             self._refresh_preview()
 
@@ -244,28 +250,38 @@ class StyleEditor(Gtk.Box):
 
     def _on_browse_image(self, _button: Gtk.Button) -> None:
         """Open a native image selector for the paper backdrop."""
-        dialog = Gtk.FileChooserNative.new(
-            "Select paper backdrop", cast(Gtk.Window, self.get_toplevel()),
-            Gtk.FileChooserAction.OPEN,
-            "Select", "Cancel")
+        parent = self.get_toplevel()
+        dialog = Gtk.FileChooserDialog(
+            title="Select paper backdrop", parent=parent,
+            action=Gtk.FileChooserAction.OPEN,
+            buttons=("Cancel", Gtk.ResponseType.CANCEL,
+                     "Select", Gtk.ResponseType.ACCEPT))
+        dialog.set_modal(True)
+        current = self.image_entry.get_text().strip()
+        if current:
+            candidate = Path(current).expanduser()
+            if candidate.is_file():
+                dialog.set_filename(str(candidate))
+            elif candidate.parent.is_dir():
+                dialog.set_current_folder(str(candidate.parent))
         image_filter = Gtk.FileFilter()
         image_filter.set_name("Images")
         image_filter.add_pixbuf_formats()
         dialog.add_filter(image_filter)
-        current = self.image_entry.get_text().strip()
-        if current:
-            dialog.set_filename(current)
+        self.on_chooser_changed(True)
 
-        def response(native: Gtk.FileChooserNative, result: int) -> None:
-            """Store the selected image path and close the native picker."""
+        def response(chooser: Gtk.FileChooserDialog, result: int) -> None:
+            """Store the selected image path and close the GTK picker."""
             if result == Gtk.ResponseType.ACCEPT:
-                selected = native.get_filename()
+                selected = chooser.get_filename()
                 if selected:
                     self.image_entry.set_text(selected)
-            native.destroy()
+            self.on_chooser_changed(False)
+            chooser.destroy()
 
         dialog.connect("response", response)
-        dialog.show()
+        self.active_file_chooser = dialog
+        dialog.show_all()
 
     def _on_apply(self, _button: Gtk.Button) -> None:
         """Persist edited appearance and report write failures inline."""
