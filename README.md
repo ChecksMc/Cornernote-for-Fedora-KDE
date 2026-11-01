@@ -92,7 +92,9 @@ defaults are in [`config.example.json`](config.example.json). `note_filename` su
 and common numeric date forms. Position uses `position_horizontal` and
 `position_vertical` (`left`/`center`/`right` and `top`/`center`/`bottom`);
 `offset_x` and `offset_y` tune that reference point in pixels. Positive X
-moves right and positive Y moves down. `monitor` selects `primary` or a
+moves right and positive Y moves down. For top and bottom positions, the
+outward Y offset is limited by the idle tab size so at least one pixel remains
+visible when the note is collapsed. `monitor` selects `primary` or a
 connected screen by its zero-based GDK display index; the settings page labels
 each screen with its manufacturer, model, resolution, and desktop position,
 truncating long labels with an ellipsis to keep the overlay width fixed.

@@ -240,15 +240,17 @@ class CornerNote(Gtk.Window):
         LayerShell.set_margin(self, x_edge, int(x_margin))
 
         vertical = self.config.get("position_vertical", "top")
+        offset_y = self.config.get("offset_y", 0)
+        visible_tab = max(1, round(self.config["height"] * self.config["idle_fraction"]))
         if vertical == "top":
             y_edge = LayerShell.Edge.TOP
-            y_margin = self.config.get("offset_y", 0)
+            y_margin = max(offset_y, 1 - visible_tab)
         elif vertical == "center":
             y_edge = LayerShell.Edge.TOP
-            y_margin = round((screen_height - self.config["height"]) / 2) + self.config.get("offset_y", 0)
+            y_margin = round((screen_height - self.config["height"]) / 2) + offset_y
         else:
             y_edge = LayerShell.Edge.BOTTOM
-            y_margin = -self.config.get("offset_y", 0)
+            y_margin = -min(offset_y, visible_tab - 1)
         LayerShell.set_anchor(self, y_edge, True)
         self.position_vertical_edge = y_edge
         self.position_vertical_base = int(y_margin)
@@ -438,6 +440,8 @@ class CornerNote(Gtk.Window):
         add_row(display_grid, 3, "X offset (px)", "offset_x", offset_x)
         offset_y = Gtk.SpinButton.new_with_range(-5000, 5000, 10)
         offset_y.set_numeric(True)
+        offset_y.set_tooltip_text(
+            "The offset is limited near the top or bottom edge so the idle tab stays visible.")
         add_row(display_grid, 4, "Y offset (px)", "offset_y", offset_y)
         width = Gtk.SpinButton.new_with_range(240, 1600, 20)
         width.set_numeric(True)
@@ -448,6 +452,9 @@ class CornerNote(Gtk.Window):
         peek = Gtk.SpinButton.new_with_range(1, 50, 1)
         peek.set_numeric(True)
         add_row(display_grid, 7, "Idle tab (%)", "idle_percent", peek)
+        vertical.connect("changed", lambda *_: self._update_y_offset_limits())
+        height.connect("value-changed", lambda *_: self._update_y_offset_limits())
+        peek.connect("value-changed", lambda *_: self._update_y_offset_limits())
 
         vault_grid = make_group("Vault and files")
         vault_entry = Gtk.Entry()
@@ -511,6 +518,7 @@ class CornerNote(Gtk.Window):
         fields["offset_y"].set_value(self.config.get("offset_y", 0))
         fields["width"].set_value(self.config["width"])
         fields["height"].set_value(self.config["height"])
+        self._update_y_offset_limits()
         self.settings_status.set_text("")
         self.page_stack.set_visible_child_name("settings")
         fields["default_vault_path"].grab_focus()
@@ -521,6 +529,25 @@ class CornerNote(Gtk.Window):
             self._show_note_page()
         else:
             self._show_settings()
+
+    def _update_y_offset_limits(self) -> None:
+        """Limit outward vertical adjustment so an idle tab remains visible."""
+        fields = getattr(self, "setting_widgets", {})
+        offset = fields.get("offset_y")
+        height = fields.get("height")
+        peek_percent = fields.get("idle_percent")
+        vertical = fields.get("position_vertical")
+        if any(widget is None for widget in (offset, height, peek_percent, vertical)):
+            return
+        visible_tab = max(1, round(height.get_value_as_int()
+                                   * peek_percent.get_value_as_int() / 100))
+        position = vertical.get_active_id()
+        if position == "top":
+            offset.set_range(1 - visible_tab, 5000)
+        elif position == "bottom":
+            offset.set_range(-5000, visible_tab - 1)
+        else:
+            offset.set_range(-5000, 5000)
 
     def _show_note_page(self) -> None:
         """Return to the note editor and restore the active editing focus."""
