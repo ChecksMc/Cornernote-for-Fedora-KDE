@@ -16,7 +16,7 @@ try:
     gi.require_version("Gtk", "3.0")
     gi.require_version("Gdk", "3.0")
     gi.require_version("GtkLayerShell", "0.1")
-    from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell as LayerShell
+    from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell as LayerShell, Pango
 except (ImportError, ValueError) as exc:
     print("CornerNote requires PyGObject GTK 3 and gtk-layer-shell. "
           "On Fedora install python3-gobject python3-cairo gtk-layer-shell.",
@@ -176,6 +176,11 @@ class CornerNote(Gtk.Window):
         if combo is None:
             return
         combo.remove_all()
+        for renderer in combo.get_cells():
+            if isinstance(renderer, Gtk.CellRendererText):
+                renderer.set_property("width-chars", 20)
+                renderer.set_property("max-width-chars", 32)
+                renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
         display = Gdk.Display.get_default()
         if display is None:
             combo.append("primary", "Primary display")

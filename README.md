@@ -94,7 +94,8 @@ and common numeric date forms. Position uses `position_horizontal` and
 `offset_x` and `offset_y` tune that reference point in pixels. Positive X
 moves right and positive Y moves down. `monitor` selects `primary` or a
 connected screen by its zero-based GDK display index; the settings page labels
-each screen with its manufacturer, model, resolution, and desktop position.
+each screen with its manufacturer, model, resolution, and desktop position,
+truncating long labels with an ellipsis to keep the overlay width fixed.
 The settings page also includes a folder chooser; under Plasma, GTK uses the
 available KDE file chooser portal.
 
