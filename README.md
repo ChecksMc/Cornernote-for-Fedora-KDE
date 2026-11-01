@@ -9,7 +9,7 @@ Fedora KDE Spin with Plasma provides the supported session. Fedora Workstation
 uses GNOME Shell/Mutter, which does not expose layer-shell or allow applications
 to place ordinary windows at exact screen coordinates under Wayland; this
 project does not claim support for GNOME Workstation overlays.
-![CornerNote demo](showcase.gif)
+![CornerNote demo](docs/showcase.gif)
 ## Requirements
 
 - Fedora KDE Plasma running a Wayland session
