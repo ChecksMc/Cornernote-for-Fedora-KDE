@@ -36,7 +36,7 @@ install -m 0755 "${PROJECT_DIR}/corner-note" "${BIN_DIR}/corner-note"
 cat > "${BIN_DIR}/cornernote-daemon" <<EOF
 #!/usr/bin/env bash
 export CORNERNOTE_CONFIG="\${XDG_CONFIG_HOME:-\${HOME}/.config}/cornernote/config.json"
-exec /usr/bin/python3 "${PROJECT_DIR}/src/main.py"
+exec /usr/bin/env python3 "${PROJECT_DIR}/src/main.py"
 EOF
 chmod 0755 "${BIN_DIR}/cornernote-daemon"
 

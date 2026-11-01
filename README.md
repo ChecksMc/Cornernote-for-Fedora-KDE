@@ -25,6 +25,12 @@ sudo dnf install python3 python3-gobject python3-cairo gtk-layer-shell
 The overlay cannot run as a layer-shell surface on X11. Check with
 `printf '%s\n' "$XDG_SESSION_TYPE"` and use a Wayland Plasma session.
 
+KWin's `wlr-layer-shell` implementation has known quirks: overlay surfaces may
+not suppress fullscreen windows on all Plasma versions, and behavior may differ
+between Plasma 5.x and 6.x. Check the [KDE bug tracker query for
+`wlr-layer-shell`](https://bugs.kde.org/buglist.cgi?quicksearch=wlr-layer-shell)
+for the current status.
+
 ## Install
 
 ```sh
@@ -143,3 +149,7 @@ CornerNote listens for systemd-logind sleep and wake notifications. On resume it
 recreates the Wayland layer surface and reapplies the selected screen and
 position, keeping the in-memory draft intact. If the system bus is unavailable,
 the overlay continues to run normally but cannot perform this resume recovery.
+
+## Roadmap / Known Limitations
+
+GTK 3 is in maintenance mode. A port to GTK 4 or Qt is a long-term consideration.
