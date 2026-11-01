@@ -178,8 +178,7 @@ class CornerNote(Gtk.Window):
         combo.remove_all()
         for renderer in combo.get_cells():
             if isinstance(renderer, Gtk.CellRendererText):
-                renderer.set_property("width-chars", 20)
-                renderer.set_property("max-width-chars", 32)
+                renderer.set_property("max-width-chars", 28)
                 renderer.set_property("ellipsize", Pango.EllipsizeMode.END)
         display = Gdk.Display.get_default()
         if display is None:
