@@ -25,6 +25,21 @@ sudo dnf install python3 python3-gobject python3-cairo gtk-layer-shell
 - GTK 3 is in maintenance mode; a GTK 4 or Qt port is a long-term consideration.
 - X11 is unsupported.
 
+## Known Issues
+
+**Overlay disappears after suspend/resume**
+On some systems the layer-shell surface is not automatically recreated after
+waking from suspend. The service continues running normally but the overlay
+is no longer visible. Workaround until this is resolved:
+
+```bash
+    systemctl --user restart cornernote
+```
+
+This is a Wayland compositor surface lifecycle issue and may affect other
+layer-shell applications on the same setup. Multi-monitor and hybrid GPU
+configurations appear more likely to trigger it.
+
 ## Install
 
 ```sh
