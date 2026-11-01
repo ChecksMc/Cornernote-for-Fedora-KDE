@@ -93,9 +93,10 @@ and common numeric date forms. Position uses `position_horizontal` and
 `position_vertical` (`left`/`center`/`right` and `top`/`center`/`bottom`);
 `offset_x` and `offset_y` tune that reference point in pixels. Positive X
 moves right and positive Y moves down. `monitor` selects `primary` or a
-connected screen by its zero-based GDK display index; the settings page lists
-connected screens by their display number. The settings page also includes a folder
-chooser; under Plasma, GTK uses the available KDE file chooser portal.
+connected screen by its zero-based GDK display index; the settings page labels
+each screen with its manufacturer, model, resolution, and desktop position.
+The settings page also includes a folder chooser; under Plasma, GTK uses the
+available KDE file chooser portal.
 
 The default vault path is `~/Documents`. Change it in settings to the root of
 your own Obsidian vault before saving notes.

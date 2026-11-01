@@ -185,8 +185,15 @@ class CornerNote(Gtk.Window):
             monitor = display.get_monitor(index)
             if monitor is None:
                 continue
+            manufacturer = monitor.get_manufacturer() or ""
+            model = monitor.get_model() or ""
+            monitor_name = " ".join(part.strip() for part in (manufacturer, model)
+                                    if part.strip()) or "Display"
+            geometry = monitor.get_geometry()
             primary = monitor.is_primary()
-            label = f"Screen {index + 1}"
+            label = (f"Screen {index + 1}: {monitor_name} — "
+                     f"{geometry.width}×{geometry.height} at "
+                     f"{geometry.x},{geometry.y}")
             if primary:
                 label += " (primary)"
             combo.append(str(index), label)
