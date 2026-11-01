@@ -49,6 +49,9 @@ class CornerNote(Gtk.Window):
         self.animation_source: int | None = None
         self.collapse_source: int | None = None
         self.theme_refresh_source: int | None = None
+        self.resume_source: int | None = None
+        self.sleep_subscription: int | None = None
+        self.system_bus: Gio.DBusConnection | None = None
         self.animation_start = 0.0
         self.animation_from = 0
         self.animation_to = 0
@@ -86,6 +89,61 @@ class CornerNote(Gtk.Window):
         self.status_label.hide()
         self._watch_theme_files()
         self._clock_source = GLib.timeout_add_seconds(30, self._refresh_clock)
+
+    def watch_suspend_resume(self) -> None:
+        """Subscribe to logind sleep notifications and restore the layer surface."""
+        try:
+            self.system_bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+            self.sleep_subscription = self.system_bus.signal_subscribe(
+                "org.freedesktop.login1",
+                "org.freedesktop.login1.Manager",
+                "PrepareForSleep",
+                "/org/freedesktop/login1",
+                None,
+                Gio.DBusSignalFlags.NONE,
+                self._on_prepare_for_sleep,
+            )
+        except (GLib.Error, OSError) as exc:
+            print(f"[cornernote] suspend notifications unavailable: {exc}", file=sys.stderr)
+
+    def _on_prepare_for_sleep(self, _connection: Gio.DBusConnection,
+                              _sender: str, _path: str, _interface: str,
+                              _signal: str, parameters: GLib.Variant,
+                              _user_data: Any = None) -> None:
+        """Prepare the overlay before sleep and schedule restoration after wake."""
+        sleeping = bool(parameters.unpack()[0])
+        if sleeping:
+            self._cancel_collapse()
+            self._stop_animation()
+            self.pointer_inside = False
+            self.expanded = self.state.forced_open
+            LayerShell.set_keyboard_interactivity(self, self.expanded)
+            return
+        if self.resume_source is not None:
+            GLib.source_remove(self.resume_source)
+        self.resume_source = GLib.timeout_add(800, self._restore_after_resume)
+
+    def _restore_after_resume(self) -> bool:
+        """Recreate the layer-shell surface after the compositor resumes."""
+        self.resume_source = None
+        self._cancel_collapse()
+        self._stop_animation()
+        self.pointer_inside = False
+        self.expanded = self.state.forced_open
+        self.dropdown_open = False
+        self.file_chooser_open = False
+        self.hide()
+        LayerShell.set_namespace(self, "cornernote")
+        LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
+        LayerShell.set_keyboard_interactivity(self, self.expanded)
+        self.active_monitor = None
+        self._apply_position(initial=True)
+        self.show()
+        if self.state.forced_open:
+            self.present()
+            self._animate_to(self.position_vertical_base)
+        self._refresh_clock()
+        return GLib.SOURCE_REMOVE
 
     def idle_margin(self) -> int:
         """Return the layer-shell margin that leaves the configured tab visible."""
@@ -1036,6 +1094,7 @@ def main() -> int:
     try:
         config = load_config(os.environ.get("CORNERNOTE_CONFIG", CONFIG_PATH))
         window = CornerNote(config)
+        window.watch_suspend_resume()
         socket_server = start_server(config["socket_path"], window.toggle)
     except (OSError, RuntimeError, ValueError) as exc:
         print(f"[cornernote] startup failed: {exc}", file=sys.stderr)
@@ -1043,6 +1102,12 @@ def main() -> int:
 
     def shutdown(*_args: Any) -> bool:
         """Release IPC resources and stop GTK on process termination."""
+        if window.system_bus is not None and window.sleep_subscription is not None:
+            window.system_bus.signal_unsubscribe(window.sleep_subscription)
+            window.sleep_subscription = None
+        if window.resume_source is not None:
+            GLib.source_remove(window.resume_source)
+            window.resume_source = None
         try:
             socket_server.close()
             path = Path(config["socket_path"])

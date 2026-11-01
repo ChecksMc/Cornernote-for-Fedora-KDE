@@ -134,3 +134,8 @@ second terminal use `./corner-note toggle`. Inspect service logs with
 Layer-shell overlay surfaces can cover panels and fullscreen windows by
 design. Plasma may apply its own policy to overlay surfaces; the app does not
 poll KWin state or promise fullscreen suppression.
+
+CornerNote listens for systemd-logind sleep and wake notifications. On resume it
+recreates the Wayland layer surface and reapplies the selected screen and
+position, keeping the in-memory draft intact. If the system bus is unavailable,
+the overlay continues to run normally but cannot perform this resume recovery.
