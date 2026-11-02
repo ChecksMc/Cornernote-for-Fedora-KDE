@@ -12,17 +12,34 @@ if [[ "${XDG_SESSION_TYPE:-}" != "wayland" ]]; then
   echo "Warning: this installer expects a KDE Wayland session."
 fi
 
-missing=()
-for package in python3-gobject python3-cairo gtk-layer-shell; do
-  if command -v rpm >/dev/null && ! rpm -q "${package}" >/dev/null 2>&1; then
-    missing+=("${package}")
+if command -v rpm >/dev/null 2>&1; then
+  missing=()
+  for package in python3 python3-gobject python3-cairo gtk-layer-shell; do
+    if ! rpm -q "${package}" >/dev/null 2>&1; then
+      missing+=("${package}")
+    fi
+  done
+  if ((${#missing[@]})); then
+    if ! command -v dnf >/dev/null 2>&1; then
+      echo "Missing runtime packages: ${missing[*]}" >&2
+      echo "Install the equivalent packages with your distribution's package manager." >&2
+      exit 1
+    fi
+    echo "Installing required Fedora packages: ${missing[*]}"
+    if ((EUID == 0)); then
+      dnf install -y "${missing[@]}"
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo dnf install -y "${missing[@]}"
+    else
+      echo "Install them with: su -c 'dnf install ${missing[*]}'" >&2
+      exit 1
+    fi
   fi
-done
-if ((${#missing[@]})); then
-  echo "Missing Fedora packages: ${missing[*]}"
-  echo "Install them with: sudo dnf install ${missing[*]}"
-  exit 1
 fi
+command -v python3 >/dev/null 2>&1 || {
+  echo "Python 3 is required. Install it with your distribution's package manager." >&2
+  exit 1
+}
 python3 -c 'import gi; gi.require_version("Gtk", "3.0"); gi.require_version("GtkLayerShell", "0.1"); from gi.repository import Gtk, GtkLayerShell' || {
   echo "GTK 3 / GtkLayerShell introspection is unavailable. Install python3-gobject and gtk-layer-shell." >&2
   exit 1
