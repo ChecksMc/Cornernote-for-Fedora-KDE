@@ -6,19 +6,22 @@ and appends notes to Markdown files in an Obsidian vault.
 
 CornerNote requires KDE Plasma running on Wayland and a compositor that provides
 the `wlr-layer-shell` protocol. The `gtk-layer-shell` project also lists
-wlroots-based and some Mir compositors as compatible, but CornerNote is currently
-documented and tested on Fedora KDE. Other Plasma distributions should work when
-they provide the required GTK and layer-shell packages; their package setup may
-differ. Fedora Workstation's GNOME Shell/Mutter does not provide this protocol.
+wlroots-based and some Mir compositors as compatible, but CornerNote is
+currently documented and tested on Fedora KDE. Other Plasma distributions
+should work when they provide the required GTK and layer-shell packages; their
+package setup may differ. Fedora Workstation's GNOME Shell/Mutter does not
+provide this protocol.
 <img src="demo.gif" alt="CornerNote demo" width="400">
 ## Requirements
 
-- Fedora KDE Plasma running a Wayland session
+- KDE Plasma running a Wayland session with layer-shell support
 - Python 3, PyGObject, GTK 3, Cairo, and gtk-layer-shell
 - An Obsidian vault writable by your user
 
-On Fedora, `install.sh` installs any missing system packages with `dnf` (using
-`sudo` when needed). To install them manually instead:
+`install.sh` detects APT, DNF, Pacman, or Zypper and installs missing system
+dependencies with that package manager (using `sudo` when needed). On systems
+with other package managers, install the equivalent packages manually first.
+To install them manually on Fedora:
 
 ```sh
 sudo dnf install python3 python3-gobject python3-cairo gtk-layer-shell
@@ -39,12 +42,15 @@ for the current status.
 ./install.sh
 ```
 
-The installer installs missing Fedora dependencies, then installs a user-level
-launcher and systemd service, copies `config.example.json` to
+The installer installs missing dependencies when it recognizes your package
+manager, then installs a user-level launcher and starts CornerNote through a
+systemd user service when available, or KDE's login autostart otherwise. It
+copies `config.example.json` to
 `~/.config/cornernote/config.json` if no config exists, and enables the service
-for the graphical session. Start it with `systemctl --user start cornernote`.
-The service uses the current checkout, so keep this repository in place after
-installing.
+for the graphical session when systemd is available. Start the service with
+`systemctl --user start cornernote` or run `~/.local/bin/cornernote-daemon` when
+using login autostart. The daemon uses the current checkout, so keep this
+repository in place after installing.
 
 Remove the service and launchers with `./uninstall.sh`. This preserves your
 settings by default; use `./uninstall.sh --purge-config` to delete them too.
@@ -132,8 +138,8 @@ hide delay and slide duration are adjustable; defaults are 700 ms and 320 ms.
 - `src/ipc.py` — GLib-integrated Unix socket server and CLI client
 - `src/obsidian.py` — safe Markdown path selection and append writer
 - `corner-note` — IPC command-line client
-- `install.sh` — Fedora user installation
-- `uninstall.sh` — removes user service and launchers, optionally config
+- `install.sh` — multi-distro dependency and user installation
+- `uninstall.sh` — removes startup entries and launchers, optionally config
 - `packaging/bundle.py` — builds a distributable `CornerNote.zip`
 
 ## Development and troubleshooting

@@ -14,6 +14,7 @@ DATA_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}"
 
 systemctl --user disable --now cornernote.service >/dev/null 2>&1 || true
 rm -f "${CONFIG_HOME}/systemd/user/cornernote.service"
+rm -f "${CONFIG_HOME}/autostart/cornernote-daemon.desktop"
 rm -f "${HOME}/.local/bin/corner-note" "${HOME}/.local/bin/cornernote-daemon"
 rm -f "${DATA_HOME}/applications/cornernote.desktop"
 if [[ -n "${XDG_RUNTIME_DIR:-}" && -S "${XDG_RUNTIME_DIR}/cornernote.sock" ]]; then
