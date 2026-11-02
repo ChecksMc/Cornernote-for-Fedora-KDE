@@ -4,14 +4,17 @@ CornerNote is a small GTK 3 quick-note overlay for KDE Plasma on Wayland. It
 peeks from the top-right edge, keeps a draft in memory while it is collapsed,
 and appends notes to Markdown files in an Obsidian vault.
 
-CornerNote requires KDE Plasma running on Wayland and a compositor that provides
-the `wlr-layer-shell` protocol. The `gtk-layer-shell` project also lists
-wlroots-based and some Mir compositors as compatible, but CornerNote is
-currently documented and tested on Fedora KDE. Other Plasma distributions
-should work when they provide the required GTK and layer-shell packages; their
-package setup may differ. Fedora Workstation's GNOME Shell/Mutter does not
-provide this protocol.
-<img src="demo.gif" alt="CornerNote demo" width="400">
+CornerNote requires a Wayland compositor with the `wlr-layer-shell` protocol.
+Fedora KDE Spin with Plasma provides the supported session. Fedora Workstation
+uses GNOME Shell/Mutter, which does not expose layer-shell or allow applications
+to place ordinary windows at exact screen coordinates under Wayland; this
+project does not claim support for GNOME Workstation overlays.
+
+
+<img src="docs/showcase.gif" alt="CornerNote demo" width="400"> 
+
+
+
 ## Requirements
 
 - KDE Plasma running a Wayland session with layer-shell support
