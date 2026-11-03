@@ -70,7 +70,7 @@ mkdir -p "${BIN_DIR}" "${CONFIG_DIR}" "${APP_DIR}"
 if [[ ! -e "${CONFIG_DIR}/config.json" ]]; then
   install -m 0644 "${PROJECT_DIR}/config.example.json" "${CONFIG_DIR}/config.json"
 fi
-install -m 0755 "${PROJECT_DIR}/corner-note" "${BIN_DIR}/corner-note"
+ln -sfn "${PROJECT_DIR}/corner-note" "${BIN_DIR}/corner-note"
 cat > "${BIN_DIR}/cornernote-daemon" <<EOF
 #!/usr/bin/env bash
 export CORNERNOTE_CONFIG="\${XDG_CONFIG_HOME:-\${HOME}/.config}/cornernote/config.json"

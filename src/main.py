@@ -84,6 +84,10 @@ class CornerNote(Gtk.Window):
         self.connect("key-press-event", self._on_key)
         self.connect("delete-event", self._on_delete)
         self.connect("realize", lambda *_: self._refresh_clock())
+        display = Gdk.Display.get_default()
+        if display is not None:
+            display.connect("monitor-added", self._on_monitors_changed)
+            display.connect("monitor-removed", self._on_monitors_changed)
         self.show_all()
         self.dialog_box.hide()
         self.status_label.hide()
@@ -112,6 +116,7 @@ class CornerNote(Gtk.Window):
                               _user_data: Any = None) -> None:
         """Prepare the overlay before sleep and schedule restoration after wake."""
         sleeping = bool(parameters.unpack()[0])
+        print(f"[cornernote] sleep notification: {'suspending' if sleeping else 'resuming'}", file=sys.stderr, flush=True)
         if sleeping:
             self._cancel_collapse()
             self._stop_animation()
@@ -125,6 +130,7 @@ class CornerNote(Gtk.Window):
 
     def _restore_after_resume(self) -> bool:
         """Recreate the layer-shell surface after the compositor resumes."""
+        print("[cornernote] restoring overlay after resume", file=sys.stderr, flush=True)
         self.resume_source = None
         self._cancel_collapse()
         self._stop_animation()
@@ -143,6 +149,16 @@ class CornerNote(Gtk.Window):
             self.present()
             self._animate_to(self.position_vertical_base)
         self._refresh_clock()
+        return GLib.SOURCE_REMOVE
+
+    def _on_monitors_changed(self, _display: Gdk.Display, _monitor: Gdk.Monitor) -> None:
+        """Re-evaluate the configured screen once GDK updates its monitor list."""
+        GLib.idle_add(self._refresh_monitor)
+
+    def _refresh_monitor(self) -> bool:
+        _display, monitor, _index = self._monitor_selection()
+        if monitor is not None and monitor != self.active_monitor:
+            self._apply_position()
         return GLib.SOURCE_REMOVE
 
     def idle_margin(self) -> int:
