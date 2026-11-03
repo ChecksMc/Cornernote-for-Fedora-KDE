@@ -71,7 +71,7 @@ class CornerNote(Gtk.Window):
 
         LayerShell.init_for_window(self)
         LayerShell.set_namespace(self, "cornernote")
-        LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
+        LayerShell.set_layer(self, LayerShell.Layer.TOP)
         self._apply_position(initial=True)
         LayerShell.set_keyboard_interactivity(self, False)
 
@@ -134,7 +134,7 @@ class CornerNote(Gtk.Window):
         self.file_chooser_open = False
         self.hide()
         LayerShell.set_namespace(self, "cornernote")
-        LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
+        LayerShell.set_layer(self, LayerShell.Layer.TOP)
         LayerShell.set_keyboard_interactivity(self, self.expanded)
         self.active_monitor = None
         self._apply_position(initial=True)

@@ -33,9 +33,10 @@ sudo dnf install python3 python3-gobject python3-cairo gtk-layer-shell
 The overlay cannot run as a layer-shell surface on X11. Check with
 `printf '%s\n' "$XDG_SESSION_TYPE"` and use a Wayland Plasma session.
 
-KWin's `wlr-layer-shell` implementation has known quirks: overlay surfaces may
-not suppress fullscreen windows on all Plasma versions, and behavior may differ
-between Plasma 5.x and 6.x. Check the [KDE bug tracker query for
+CornerNote uses the layer-shell **top** layer so it stays above normal windows
+while panels can appear in front of it. KWin's `wlr-layer-shell` implementation
+has known quirks around fullscreen windows, and behavior may differ between
+Plasma 5.x and 6.x. Check the [KDE bug tracker query for
 `wlr-layer-shell`](https://bugs.kde.org/buglist.cgi?quicksearch=wlr-layer-shell)
 for the current status.
 
@@ -152,9 +153,10 @@ second terminal use `./corner-note toggle`. Inspect service logs with
 `journalctl --user -u cornernote -f`. The socket defaults to
 `$XDG_RUNTIME_DIR/cornernote.sock`, which is private to the login session.
 
-Layer-shell overlay surfaces can cover panels and fullscreen windows by
-design. Plasma may apply its own policy to overlay surfaces; the app does not
-poll KWin state or promise fullscreen suppression.
+CornerNote does not use the higher overlay layer, allowing panels above it to
+cover the note while it slides. Fullscreen handling still depends on KWin's
+layer-shell policy; the app does not poll KWin state or promise fullscreen
+suppression.
 
 CornerNote listens for systemd-logind sleep and wake notifications. On resume it
 recreates the Wayland layer surface and reapplies the selected screen and
